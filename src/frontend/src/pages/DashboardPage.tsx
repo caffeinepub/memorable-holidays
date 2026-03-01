@@ -9,6 +9,7 @@ import {
   BookOpen,
   Clock,
   DollarSign,
+  FileText,
   FolderOpen,
   Globe,
   Package,
@@ -19,9 +20,11 @@ import {
   TrendingUp,
   Users,
   Users2,
+  Zap,
 } from "lucide-react";
 import {
   useGetActivePromotions,
+  useGetAllInvoices,
   useGetAnalyticsSummary,
   useGetCallerUserProfile,
   useGetLeads,
@@ -35,7 +38,10 @@ export default function DashboardPage() {
   const { data: reminders = [] } = useGetReminders();
   const { data: leads = [] } = useGetLeads();
   const { data: activePromotions = [] } = useGetActivePromotions();
+  const { data: allInvoices = [] } = useGetAllInvoices();
   const isAdmin = userProfile?.role === "admin";
+
+  const pendingInvoices = allInvoices.filter((inv) => inv.status !== "Paid");
 
   const now = Date.now();
   const next7Days = now + 7 * 24 * 60 * 60 * 1000;
@@ -97,6 +103,13 @@ export default function DashboardPage() {
       color: "text-orange-400",
       bg: "bg-orange-500/10 border-orange-500/20",
     },
+    {
+      label: "Pending Invoices",
+      value: pendingInvoices.length,
+      icon: FileText,
+      color: "text-red-400",
+      bg: "bg-red-500/10 border-red-500/20",
+    },
   ];
 
   const quickActions = [
@@ -106,6 +119,13 @@ export default function DashboardPage() {
       icon: PlusCircle,
       gradient: "from-gold-dark to-gold",
       action: () => navigate({ to: "/categories" }),
+    },
+    {
+      label: "Quick Quote",
+      description: "Instant price calculator",
+      icon: Zap,
+      gradient: "from-yellow-700 to-yellow-500",
+      action: () => navigate({ to: "/quick-quote" }),
     },
     {
       label: "Add Lead",
@@ -217,7 +237,7 @@ export default function DashboardPage() {
 
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {stats.map(({ label, value, icon: Icon, color, bg }) => (
             <Card
               key={label}

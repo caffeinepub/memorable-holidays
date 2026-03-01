@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -13,10 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  Calendar,
   Clock,
+  ExternalLink,
   Loader2,
   Mail,
   MessageCircle,
+  Package,
   Phone,
   Plus,
 } from "lucide-react";
@@ -28,7 +32,9 @@ import {
   useAddInteractionLog,
   useGetGuestRecords,
   useGetInteractionLog,
+  useGetPackages,
 } from "../hooks/useQueries";
+import { packageStore } from "../lib/packageStore";
 
 const CHANNELS = [
   "WhatsApp",
@@ -61,6 +67,10 @@ export default function CustomerDetailPage() {
   const { data: logs = [], isLoading: logsLoading } =
     useGetInteractionLog(decodedName);
   const { mutateAsync: addLog, isPending: isAdding } = useAddInteractionLog();
+  const { data: allPackages = [] } = useGetPackages();
+  const linkedPackages = allPackages.filter(
+    (p) => p.guest.name.toLowerCase() === decodedName.toLowerCase(),
+  );
 
   const [newNote, setNewNote] = useState("");
   const [channel, setChannel] = useState("WhatsApp");
@@ -158,7 +168,16 @@ export default function CustomerDetailPage() {
                   {customer.whatsapp && (
                     <div className="flex items-center gap-2 text-sm font-sans">
                       <MessageCircle className="w-4 h-4 text-teal shrink-0" />
-                      <span>{customer.whatsapp}</span>
+                      <span className="flex-1">{customer.whatsapp}</span>
+                      <a
+                        href={`https://wa.me/${customer.whatsapp.replace(/[^0-9]/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-teal hover:text-teal-dark transition-colors"
+                        title="Open WhatsApp"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
                     </div>
                   )}
                   {customer.travelDates && (
@@ -189,6 +208,52 @@ export default function CustomerDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Linked Packages */}
+          {linkedPackages.length > 0 && (
+            <Card className="premium-card mt-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="font-serif text-base flex items-center gap-2">
+                  <Package className="w-4 h-4 text-gold" />
+                  Linked Packages ({linkedPackages.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {linkedPackages.map((pkg) => (
+                  <button
+                    key={String(pkg.id)}
+                    type="button"
+                    onClick={() => {
+                      packageStore.loadFromPackage(pkg);
+                      navigate({ to: "/editor" });
+                    }}
+                    className="w-full text-left flex items-center gap-3 p-2.5 rounded-lg bg-card border border-border/40 hover:border-gold/30 transition-all"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center shrink-0">
+                      <Package className="w-3.5 h-3.5 text-gold" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-display font-semibold text-foreground truncate">
+                        {pkg.category}
+                      </p>
+                      {pkg.guest.travelDates && (
+                        <p className="text-[10px] text-muted-foreground font-sans flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5" />
+                          {pkg.guest.travelDates}
+                        </p>
+                      )}
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-mono border-gold/30 text-gold shrink-0"
+                    >
+                      ₹{Number(pkg.totalCost).toLocaleString()}
+                    </Badge>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Interaction Log */}

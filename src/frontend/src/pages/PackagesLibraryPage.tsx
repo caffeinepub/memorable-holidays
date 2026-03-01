@@ -16,9 +16,11 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Calendar,
+  CalendarDays,
   Copy,
   Edit,
   Eye,
+  FileText,
   FolderOpen,
   Loader2,
   PlusCircle,
@@ -79,6 +81,16 @@ export default function PackagesLibraryPage() {
     packageStore.loadFromPackage(duplicated);
     navigate({ to: "/editor" });
     toast.success("Package duplicated — edit and save to create a copy");
+  };
+
+  const handleViewItinerary = (pkg: Package) => {
+    packageStore.loadFromPackage(pkg);
+    navigate({ to: "/itinerary" });
+  };
+
+  const handleCreateInvoice = (pkg: Package) => {
+    packageStore.loadFromPackage(pkg);
+    navigate({ to: "/invoices" });
   };
 
   const handleDelete = async (packageId: bigint) => {
@@ -232,72 +244,94 @@ export default function PackagesLibraryPage() {
                     )}
                   </div>
 
-                  <div className="flex gap-2 pt-3 border-t border-border/50">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePreview(pkg)}
-                      className="flex-1 font-sans text-xs border-border/60 hover:border-teal/40 hover:text-teal hover:bg-teal/5"
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      Preview
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEdit(pkg)}
-                      className="flex-1 font-sans text-xs border-gold/30 text-gold hover:bg-gold/10 hover:border-gold/50"
-                    >
-                      <Edit className="w-3 h-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDuplicate(pkg)}
-                      className="font-sans text-xs border-border/60 text-muted-foreground hover:border-teal/40 hover:text-teal"
-                      title="Duplicate"
-                    >
-                      <Copy className="w-3 h-3" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="font-sans text-xs border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/60"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-card border-border">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="font-display text-foreground">
-                            Delete Package?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription className="font-sans text-muted-foreground">
-                            This will permanently delete the package for{" "}
-                            <strong className="text-foreground">
-                              {pkg.guest.name}
-                            </strong>
-                            . This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="font-sans">
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(pkg.id)}
-                            className="font-sans bg-destructive hover:bg-destructive/90"
-                            disabled={isDeleting}
+                  <div className="pt-3 border-t border-border/50 space-y-2">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePreview(pkg)}
+                        className="flex-1 font-sans text-xs border-border/60 hover:border-teal/40 hover:text-teal hover:bg-teal/5"
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        Preview
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(pkg)}
+                        className="flex-1 font-sans text-xs border-gold/30 text-gold hover:bg-gold/10 hover:border-gold/50"
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDuplicate(pkg)}
+                        className="font-sans text-xs border-border/60 text-muted-foreground hover:border-teal/40 hover:text-teal"
+                        title="Duplicate"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="font-sans text-xs border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/60"
+                            title="Delete"
                           >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-card border-border">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="font-display text-foreground">
+                              Delete Package?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="font-sans text-muted-foreground">
+                              This will permanently delete the package for{" "}
+                              <strong className="text-foreground">
+                                {pkg.guest.name}
+                              </strong>
+                              . This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="font-sans">
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(pkg.id)}
+                              className="font-sans bg-destructive hover:bg-destructive/90"
+                              disabled={isDeleting}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleViewItinerary(pkg)}
+                        className="flex-1 font-sans text-xs border-border/60 text-muted-foreground hover:border-blue-400/40 hover:text-blue-400"
+                      >
+                        <CalendarDays className="w-3 h-3 mr-1" />
+                        Itinerary
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCreateInvoice(pkg)}
+                        className="flex-1 font-sans text-xs border-border/60 text-muted-foreground hover:border-orange-400/40 hover:text-orange-400"
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        Invoice
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

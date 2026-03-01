@@ -15,6 +15,7 @@ import CustomerDatabasePage from "./pages/CustomerDatabasePage";
 import CustomerDetailPage from "./pages/CustomerDetailPage";
 import DashboardPage from "./pages/DashboardPage";
 import InvoicePage from "./pages/InvoicePage";
+import ItineraryBuilderPage from "./pages/ItineraryBuilderPage";
 import LeadDetailPage from "./pages/LeadDetailPage";
 import LeadsPage from "./pages/LeadsPage";
 import LoginPage from "./pages/LoginPage";
@@ -22,6 +23,7 @@ import PackageEditorPage from "./pages/PackageEditorPage";
 import PackagePreviewPage from "./pages/PackagePreviewPage";
 import PackagesLibraryPage from "./pages/PackagesLibraryPage";
 import PromotionsPage from "./pages/PromotionsPage";
+import QuickQuotePage from "./pages/QuickQuotePage";
 import RemindersPage from "./pages/RemindersPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import TemplateLibraryPage from "./pages/TemplateLibraryPage";
@@ -174,6 +176,18 @@ const rateManagementRoute = createRoute({
   component: RateManagementPage,
 });
 
+const itineraryRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/itinerary",
+  component: ItineraryBuilderPage,
+});
+
+const quickQuoteRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/quick-quote",
+  component: QuickQuotePage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appLayoutRoute.addChildren([
@@ -200,6 +214,9 @@ const routeTree = rootRoute.addChildren([
     companySettingsRoute,
     userManagementRoute,
     rateManagementRoute,
+    // New pages
+    itineraryRoute,
+    quickQuoteRoute,
   ]),
 ]);
 

@@ -12,6 +12,7 @@ import {
   Bell,
   Building2,
   CalendarCheck,
+  CalendarDays,
   ChevronDown,
   FileText,
   FolderOpen,
@@ -24,6 +25,7 @@ import {
   Tag,
   Users,
   Users2,
+  Zap,
 } from "lucide-react";
 import type { UserPrivileges } from "../../backend.d.ts";
 import { useCredentialSession } from "../../contexts/CredentialSessionContext";
@@ -54,9 +56,21 @@ const coreNavItems: NavItem[] = [
     privilegeKey: "newPackage",
   },
   {
+    to: "/quick-quote",
+    label: "Quick Quote",
+    icon: Zap,
+    privilegeKey: "newPackage",
+  },
+  {
     to: "/packages",
     label: "Packages",
     icon: FolderOpen,
+    privilegeKey: "packagesLibrary",
+  },
+  {
+    to: "/itinerary",
+    label: "Itinerary",
+    icon: CalendarDays,
     privilegeKey: "packagesLibrary",
   },
   { to: "/leads", label: "Leads", icon: Users2, privilegeKey: "leads" },

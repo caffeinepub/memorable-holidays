@@ -82,6 +82,9 @@ export default function ReviewsPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [ratingVal, setRatingVal] = useState(5);
+  const [publishFilter, setPublishFilter] = useState<
+    "all" | "published" | "unpublished"
+  >("all");
 
   const update = (k: keyof typeof form, v: string) =>
     setForm((p) => ({ ...p, [k]: v }));
@@ -135,6 +138,12 @@ export default function ReviewsPage() {
         ).toFixed(1)
       : "–";
 
+  const filteredReviews = reviews.filter((r) => {
+    if (publishFilter === "published") return r.isPublished;
+    if (publishFilter === "unpublished") return !r.isPublished;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <div className="bg-sidebar border-b border-border px-4 py-5">
@@ -160,13 +169,27 @@ export default function ReviewsPage() {
               )}
             </div>
           </div>
-          <Button
-            onClick={() => setShowModal(true)}
-            className="gradient-gold text-sidebar font-display font-bold shadow-gold"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Add Review
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+              {(["all", "published", "unpublished"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setPublishFilter(f)}
+                  className={`px-3 py-1 rounded text-xs font-sans font-medium capitalize transition-all ${publishFilter === f ? "bg-gold/20 text-gold" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={() => setShowModal(true)}
+              className="gradient-gold text-sidebar font-display font-bold shadow-gold"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Review
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -175,25 +198,31 @@ export default function ReviewsPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-gold" />
           </div>
-        ) : reviews.length === 0 ? (
+        ) : filteredReviews.length === 0 ? (
           <Card className="premium-card">
             <CardContent className="flex flex-col items-center justify-center py-16">
               <Star className="w-14 h-14 text-muted-foreground/20 mb-4" />
-              <p className="text-muted-foreground font-sans">No reviews yet.</p>
-              <Button
-                onClick={() => setShowModal(true)}
-                variant="outline"
-                size="sm"
-                className="mt-3 border-gold/40 text-gold hover:bg-gold/10 font-sans"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Add first review
-              </Button>
+              <p className="text-muted-foreground font-sans">
+                {reviews.length === 0
+                  ? "No reviews yet."
+                  : `No ${publishFilter} reviews.`}
+              </p>
+              {reviews.length === 0 && (
+                <Button
+                  onClick={() => setShowModal(true)}
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 border-gold/40 text-gold hover:bg-gold/10 font-sans"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Add first review
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {reviews.map((review) => (
+            {filteredReviews.map((review) => (
               <Card
                 key={String(review.id)}
                 className={`premium-card hover:border-gold/30 transition-all group ${!review.isPublished ? "opacity-70" : ""}`}

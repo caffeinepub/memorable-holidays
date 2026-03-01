@@ -14,7 +14,7 @@ export default function PackagePreviewPage() {
   const previewRef = useRef<HTMLDivElement>(null);
   const state = packageStore.get();
   const company = companyStore.get();
-  const [showShare, setShowShare] = useState(false);
+  const [showShare, setShowShare] = useState(true);
 
   const handlePrint = () => {
     window.print();
@@ -84,25 +84,38 @@ export default function PackagePreviewPage() {
         <div className="xl:col-span-2">
           <div
             ref={previewRef}
-            className="border border-border rounded-xl overflow-hidden shadow-lg bg-white"
+            id="package-preview-root"
+            className="border border-border rounded-xl overflow-hidden shadow-lg bg-white print-preview-wrapper"
           >
             <PackageTemplatePreview state={state} />
           </div>
         </div>
 
-        {/* Share Panel */}
-        {showShare && (
-          <div className="xl:col-span-1 print:hidden">
-            <SharePanel state={state} company={company} />
-          </div>
-        )}
+        {/* Share Panel — visible by default */}
+        <div
+          className={`xl:col-span-1 print:hidden ${showShare ? "" : "hidden xl:hidden"}`}
+        >
+          <SharePanel state={state} company={company} />
+        </div>
       </div>
 
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #package-preview-content, #package-preview-content * { visibility: visible; }
-          #package-preview-content { position: absolute; left: 0; top: 0; width: 100%; }
+          body > * { display: none !important; }
+          .print\\:hidden { display: none !important; }
+          #package-preview-root { display: block !important; }
+          #package-preview-root * { visibility: visible; }
+          .print-preview-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            background: white;
+            z-index: 9999;
+          }
         }
       `}</style>
     </div>

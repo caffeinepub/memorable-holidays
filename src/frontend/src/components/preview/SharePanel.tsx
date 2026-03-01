@@ -55,8 +55,8 @@ function buildMessage(
 }
 
 export default function SharePanel({ state, company }: Props) {
-  const [customPhone, setCustomPhone] = useState("");
-  const [customEmail, setCustomEmail] = useState("");
+  const [customPhone, setCustomPhone] = useState(state.whatsapp || "");
+  const [customEmail, setCustomEmail] = useState(state.email || "");
 
   const message = buildMessage(state, company);
   const encodedMessage = encodeURIComponent(message);
@@ -65,8 +65,14 @@ export default function SharePanel({ state, company }: Props) {
   );
   const emailBody = encodeURIComponent(message.replace(/\*/g, ""));
 
+  const guestWhatsapp = state.whatsapp || "";
   const whatsappNumber = customPhone || company.whatsapp || "";
   const emailAddress = customEmail || company.email || "";
+
+  // Guest's WhatsApp link
+  const guestWhatsappUrl = guestWhatsapp
+    ? `https://wa.me/${guestWhatsapp.replace(/[^0-9]/g, "")}?text=${encodedMessage}`
+    : "";
 
   const whatsappUrl = whatsappNumber
     ? `https://wa.me/${whatsappNumber.replace(/[^0-9]/g, "")}?text=${encodedMessage}`
@@ -82,37 +88,17 @@ export default function SharePanel({ state, company }: Props) {
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodedMessage}`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message).then(() => {
+    navigator.clipboard.writeText(message.replace(/\*/g, "")).then(() => {
       toast.success("Package details copied to clipboard!");
     });
   };
 
-  const shareChannels = [
-    {
-      label: "WhatsApp",
-      icon: MessageCircle,
-      color: "bg-teal hover:bg-teal-dark text-sidebar",
-      url: whatsappUrl,
-    },
-    {
-      label: "Email",
-      icon: Mail,
-      color: "bg-gold/20 border border-gold/40 text-gold hover:bg-gold/30",
-      url: mailtoUrl,
-    },
-    {
-      label: "Twitter / X",
-      icon: Twitter,
-      color: "bg-secondary hover:bg-accent text-foreground",
-      url: twitterUrl,
-    },
-    {
-      label: "Facebook",
-      icon: Facebook,
-      color: "bg-secondary hover:bg-accent text-foreground",
-      url: facebookUrl,
-    },
-  ];
+  const handleInstagram = () => {
+    navigator.clipboard.writeText(message.replace(/\*/g, "")).then(() => {
+      toast.success("Message copied! Opening Instagram DMs...");
+      window.open("https://www.instagram.com/direct/new/", "_blank");
+    });
+  };
 
   return (
     <Card className="border-border">
@@ -122,10 +108,36 @@ export default function SharePanel({ state, company }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Guest WhatsApp */}
+        {guestWhatsapp && (
+          <>
+            <div className="space-y-1">
+              <Label className="font-sans text-xs text-muted-foreground uppercase tracking-wide">
+                Send to Guest
+              </Label>
+              <a
+                href={guestWhatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Send to Guest WhatsApp
+                <span className="text-xs opacity-70 ml-1">{guestWhatsapp}</span>
+                <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
+              </a>
+            </div>
+            <Separator />
+          </>
+        )}
+
         {/* Custom recipient */}
         <div className="space-y-3">
+          <Label className="font-sans text-xs text-muted-foreground uppercase tracking-wide">
+            Custom Recipient
+          </Label>
           <div className="space-y-1">
-            <Label className="font-sans text-xs">Send to WhatsApp Number</Label>
+            <Label className="font-sans text-xs">WhatsApp Number</Label>
             <Input
               value={customPhone}
               onChange={(e) => setCustomPhone(e.target.value)}
@@ -134,7 +146,7 @@ export default function SharePanel({ state, company }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <Label className="font-sans text-xs">Send to Email</Label>
+            <Label className="font-sans text-xs">Email Address</Label>
             <Input
               type="email"
               value={customEmail}
@@ -149,19 +161,55 @@ export default function SharePanel({ state, company }: Props) {
 
         {/* Share buttons */}
         <div className="space-y-2">
-          {shareChannels.map(({ label, icon: Icon, color, url }) => (
-            <a
-              key={label}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors ${color}`}
-            >
-              <Icon className="w-4 h-4" />
-              Share via {label}
-              <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
-            </a>
-          ))}
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-teal hover:bg-teal-dark text-sidebar"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Share via WhatsApp
+            <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
+          </a>
+          <a
+            href={mailtoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-gold/20 border border-gold/40 text-gold hover:bg-gold/30"
+          >
+            <Mail className="w-4 h-4" />
+            Share via Email
+            <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
+          </a>
+          <button
+            type="button"
+            onClick={handleInstagram}
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-secondary hover:bg-accent text-foreground"
+          >
+            <Instagram className="w-4 h-4" />
+            Copy & Open Instagram DM
+            <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
+          </button>
+          <a
+            href={twitterUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-secondary hover:bg-accent text-foreground"
+          >
+            <Twitter className="w-4 h-4" />
+            Share via Twitter / X
+            <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
+          </a>
+          <a
+            href={facebookUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-secondary hover:bg-accent text-foreground"
+          >
+            <Facebook className="w-4 h-4" />
+            Share via Facebook
+            <ExternalLink className="w-3 h-3 ml-auto opacity-70" />
+          </a>
         </div>
 
         <Separator />

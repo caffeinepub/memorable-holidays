@@ -18,13 +18,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Eye, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  Eye,
+  FileText,
+  Loader2,
+  Plus,
+  Printer,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice, InvoiceLineItem } from "../backend.d.ts";
 import {
   useCreateInvoice,
   useGetAllInvoices,
+  useGetCompanySettings,
   useMarkInvoicePaid,
 } from "../hooks/useQueries";
 
@@ -38,6 +47,7 @@ const defaultLineItem = { id: 0, description: "", qty: "1", unitPrice: "" };
 
 export default function InvoicePage() {
   const { data: invoices = [], isLoading } = useGetAllInvoices();
+  const { data: companySettings } = useGetCompanySettings();
   const { mutateAsync: createInvoice, isPending: isCreating } =
     useCreateInvoice();
   const { mutateAsync: markPaid } = useMarkInvoicePaid();
@@ -121,6 +131,109 @@ export default function InvoicePage() {
     } catch {
       toast.error("Failed to update");
     }
+  };
+
+  const handlePrintInvoice = (inv: Invoice) => {
+    const companyName = companySettings?.companyName || "Memorable Holidays";
+    const companyAddress = companySettings?.address || "";
+    const companyPhone = companySettings?.phone || "";
+    const companyEmail = companySettings?.email || "";
+    const companyGST = companySettings?.gstNumber || "";
+
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    if (!printWindow) return;
+
+    const rows = inv.lineItems
+      .map(
+        (item) =>
+          `<tr style="border-bottom:1px solid #e5e7eb">
+            <td style="padding:8px 12px;font-size:13px">${item.description}</td>
+            <td style="padding:8px 12px;text-align:center;font-size:13px">${Number(item.qty)}</td>
+            <td style="padding:8px 12px;text-align:right;font-size:13px">₹${Number(item.unitPrice).toLocaleString()}</td>
+            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:600">₹${Number(item.total).toLocaleString()}</td>
+          </tr>`,
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${inv.invoiceNumber}</title>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 24px; color: #111; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+          .company-name { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+          .company-details { font-size: 12px; color: #555; margin-top: 4px; }
+          .invoice-title { font-size: 28px; font-weight: 700; color: #c9a227; text-align: right; }
+          .invoice-meta { font-size: 12px; color: #555; text-align: right; margin-top: 4px; }
+          .divider { border: none; border-top: 2px solid #c9a227; margin: 16px 0; }
+          .bill-to { background: #f9f9f9; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; }
+          thead tr { background: #1a1a2e; color: white; }
+          thead th { padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
+          .totals { margin-top: 16px; float: right; width: 280px; }
+          .totals table { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+          .totals td { padding: 8px 12px; font-size: 13px; }
+          .grand-total { background: #c9a227; color: white; font-weight: 700; font-size: 15px; }
+          .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+          .status-paid { background: #d1fae5; color: #065f46; }
+          .status-draft { background: #f3f4f6; color: #374151; }
+          .status-sent { background: #dbeafe; color: #1e40af; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="company-name">${companyName}</div>
+            <div class="company-details">
+              ${companyAddress ? `${companyAddress}<br>` : ""}
+              ${companyPhone ? `📞 ${companyPhone}` : ""}
+              ${companyEmail ? ` | ✉️ ${companyEmail}` : ""}
+              ${companyGST ? `<br>GST: ${companyGST}` : ""}
+            </div>
+          </div>
+          <div>
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-meta">
+              <strong>#${inv.invoiceNumber}</strong><br>
+              Issued: ${formatDate(inv.issuedDate)}<br>
+              ${Number(inv.dueDate) > 0 ? `Due: ${formatDate(inv.dueDate)}<br>` : ""}
+              <span class="status-badge status-${inv.status.toLowerCase()}">${inv.status}</span>
+            </div>
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="bill-to">
+          <strong>Bill To:</strong><br>
+          <span style="font-size:16px;font-weight:600">${inv.guestName}</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style="text-align:center">Qty</th>
+              <th style="text-align:right">Unit Price</th>
+              <th style="text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="totals">
+          <table>
+            <tr><td>Subtotal</td><td style="text-align:right">₹${Number(inv.subtotal).toLocaleString()}</td></tr>
+            <tr><td>Tax (${Number(inv.taxPercent)}%)</td><td style="text-align:right">₹${Number(inv.taxAmount).toLocaleString()}</td></tr>
+            <tr class="grand-total"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong>₹${Number(inv.grandTotal).toLocaleString()}</strong></td></tr>
+          </table>
+        </div>
+        ${inv.notes ? `<div style="clear:both;margin-top:32px;padding:12px;background:#f9f9f9;border-radius:8px;font-size:12px;color:#555"><strong>Notes:</strong> ${inv.notes}</div>` : ""}
+        <script>window.onload = function(){ window.print(); window.close(); }</script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const formatDate = (ts: bigint) => {
@@ -536,18 +649,28 @@ export default function InvoicePage() {
                 </p>
               )}
 
-              {viewInvoice.status !== "Paid" && (
+              <div className="flex gap-2">
                 <Button
-                  onClick={() => {
-                    handleMarkPaid(viewInvoice.id);
-                    setViewInvoice(null);
-                  }}
-                  className="w-full font-sans bg-green-600 hover:bg-green-700 text-white"
+                  variant="outline"
+                  onClick={() => handlePrintInvoice(viewInvoice)}
+                  className="flex-1 font-sans border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
                 >
-                  <Check className="w-4 h-4 mr-2" />
-                  Mark as Paid
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Invoice
                 </Button>
-              )}
+                {viewInvoice.status !== "Paid" && (
+                  <Button
+                    onClick={() => {
+                      handleMarkPaid(viewInvoice.id);
+                      setViewInvoice(null);
+                    }}
+                    className="flex-1 font-sans bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Mark as Paid
+                  </Button>
+                )}
+              </div>
             </div>
           </DialogContent>
         )}

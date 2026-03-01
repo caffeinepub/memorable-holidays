@@ -3,16 +3,20 @@ import {
   BarChart3,
   BookOpen,
   DollarSign,
+  FileText,
   Loader2,
   MapPin,
   Package,
+  Radio,
   TrendingUp,
   Users,
   Users2,
 } from "lucide-react";
 import {
+  useGetAllInvoices,
   useGetAnalyticsSummary,
   useGetBookings,
+  useGetLeads,
   useGetLeadsByStage,
   useGetTopDestinations,
 } from "../hooks/useQueries";
@@ -57,14 +61,37 @@ export default function AnalyticsPage() {
   const { data: topDestinations = [], isLoading: destLoading } =
     useGetTopDestinations();
   const { data: bookings = [], isLoading: bookingsLoading } = useGetBookings();
+  const { data: allLeads = [], isLoading: leadsLoading } = useGetLeads();
+  const { data: allInvoices = [], isLoading: invoicesLoading } =
+    useGetAllInvoices();
 
   const isLoading =
-    summaryLoading || stageLoading || destLoading || bookingsLoading;
+    summaryLoading ||
+    stageLoading ||
+    destLoading ||
+    bookingsLoading ||
+    leadsLoading ||
+    invoicesLoading;
 
   const bookingStatusMap = bookings.reduce<Record<string, number>>((acc, b) => {
     acc[b.status] = (acc[b.status] || 0) + 1;
     return acc;
   }, {});
+
+  // Lead source breakdown
+  const leadSourceMap = allLeads.reduce<Record<string, number>>((acc, l) => {
+    const source = l.source || "Unknown";
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  }, {});
+  const maxSourceCount = Math.max(...Object.values(leadSourceMap), 1);
+
+  // Pending invoices
+  const pendingInvoices = allInvoices.filter((inv) => inv.status !== "Paid");
+  const pendingInvoiceTotal = pendingInvoices.reduce(
+    (sum, inv) => sum + Number(inv.grandTotal),
+    0,
+  );
 
   const maxStageCount = Math.max(...stageCounts.map((s) => Number(s.count)), 1);
   const maxDestCount = Math.max(
@@ -116,6 +143,20 @@ export default function AnalyticsPage() {
           color: "text-orange-400",
           bg: "bg-orange-500/10 border-orange-500/20",
         },
+        {
+          label: "Pending Invoices",
+          value: pendingInvoices.length,
+          icon: FileText,
+          color: "text-red-400",
+          bg: "bg-red-500/10 border-red-500/20",
+        },
+        {
+          label: "Pending Value",
+          value: `₹${pendingInvoiceTotal.toLocaleString()}`,
+          icon: DollarSign,
+          color: "text-amber-400",
+          bg: "bg-amber-500/10 border-amber-500/20",
+        },
       ]
     : [];
 
@@ -143,7 +184,7 @@ export default function AnalyticsPage() {
 
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Stat Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, bg }) => (
             <Card key={label} className="premium-card">
               <CardContent className="p-4">
@@ -287,6 +328,48 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Lead Source Breakdown */}
+          <Card className="premium-card">
+            <CardHeader className="pb-4">
+              <CardTitle className="font-display text-base flex items-center gap-2">
+                <Radio className="w-4 h-4 text-orange-400" />
+                Lead Source Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {Object.keys(leadSourceMap).length === 0 ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground font-sans text-sm">
+                  No lead data yet
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {Object.entries(leadSourceMap)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([source, count]) => (
+                      <div key={source} className="flex items-center gap-3">
+                        <div className="w-28 shrink-0 text-xs font-sans text-muted-foreground truncate">
+                          {source}
+                        </div>
+                        <div className="flex-1 h-6 bg-card rounded-md overflow-hidden">
+                          <div
+                            className="h-full rounded-md bg-orange-500 opacity-80 flex items-center justify-end pr-2 transition-all duration-500"
+                            style={{
+                              width: `${(count / maxSourceCount) * 100}%`,
+                              minWidth: "2rem",
+                            }}
+                          >
+                            <span className="text-[10px] font-mono font-bold text-white">
+                              {count}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
             </CardContent>

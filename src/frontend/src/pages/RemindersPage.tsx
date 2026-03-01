@@ -66,7 +66,12 @@ export default function RemindersPage() {
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultForm);
-  const [filter, setFilter] = useState<"all" | "pending" | "done">("all");
+  const [filter, setFilter] = useState<"all" | "pending" | "done" | "overdue">(
+    "all",
+  );
+  const [entityFilter, setEntityFilter] = useState<
+    "all" | "Lead" | "Booking" | "Custom"
+  >("all");
 
   const update = (k: keyof typeof form, v: string) =>
     setForm((p) => ({ ...p, [k]: v }));
@@ -115,8 +120,13 @@ export default function RemindersPage() {
     (a, b) => Number(a.reminderDate) - Number(b.reminderDate),
   );
   const filtered = sorted.filter((r) => {
+    const overdue = isOverdue(r.reminderDate, r.status);
     if (filter === "pending") return r.status === "Pending";
     if (filter === "done") return r.status === "Done";
+    if (filter === "overdue") return overdue;
+    // entity filter
+    if (entityFilter === "Custom") return r.reminderType === "Custom";
+    if (entityFilter !== "all") return r.entityType === entityFilter;
     return true;
   });
 
@@ -160,9 +170,9 @@ export default function RemindersPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
-              {(["all", "pending", "done"] as const).map((f) => (
+              {(["all", "pending", "done", "overdue"] as const).map((f) => (
                 <button
                   key={f}
                   type="button"
@@ -170,6 +180,18 @@ export default function RemindersPage() {
                   className={`px-3 py-1 rounded text-xs font-sans font-medium capitalize transition-all ${filter === f ? "bg-gold/20 text-gold" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {f}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 bg-card border border-border rounded-lg p-1">
+              {(["all", "Lead", "Booking", "Custom"] as const).map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEntityFilter(e)}
+                  className={`px-3 py-1 rounded text-xs font-sans font-medium capitalize transition-all ${entityFilter === e ? "bg-teal/20 text-teal" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {e}
                 </button>
               ))}
             </div>

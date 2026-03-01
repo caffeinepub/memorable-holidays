@@ -21,6 +21,7 @@ import {
   Loader2,
   Mail,
   MapPin,
+  Package,
   Phone,
   Plus,
   Save,
@@ -34,6 +35,7 @@ import {
   useGetLeadById,
   useUpdateLead,
 } from "../hooks/useQueries";
+import { packageStore } from "../lib/packageStore";
 
 const STAGES = [
   "NewLead",
@@ -92,6 +94,20 @@ export default function LeadDetailPage() {
   const [reminderMsg, setReminderMsg] = useState("");
   const [reminderDate, setReminderDate] = useState("");
   const [reminderType, setReminderType] = useState("FollowUp");
+
+  const handleConvertToPackage = () => {
+    if (!lead) return;
+    packageStore.reset();
+    packageStore.set({
+      guestName: lead.guestName,
+      contactNumber: lead.phone,
+      email: lead.email,
+      whatsapp: lead.phone,
+      travelDates: lead.travelDates,
+      notes: lead.notes,
+    });
+    navigate({ to: "/categories" });
+  };
 
   if (isLoading) {
     return (
@@ -174,7 +190,7 @@ export default function LeadDetailPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <Button
           variant="outline"
           size="sm"
@@ -197,6 +213,14 @@ export default function LeadDetailPage() {
         >
           {STAGE_LABELS[currentStage] ?? currentStage}
         </Badge>
+        <Button
+          onClick={handleConvertToPackage}
+          className="gradient-gold text-sidebar font-display font-bold shadow-gold shrink-0"
+          size="sm"
+        >
+          <Package className="w-4 h-4 mr-1.5" />
+          Convert to Package
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
