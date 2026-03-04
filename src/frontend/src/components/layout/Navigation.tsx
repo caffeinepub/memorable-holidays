@@ -14,6 +14,7 @@ import {
   CalendarCheck,
   CalendarDays,
   ChevronDown,
+  Database,
   FileText,
   FolderOpen,
   Hotel,
@@ -205,7 +206,7 @@ export default function Navigation() {
   // Empty state for restricted credential users
   if (isCredentialUser && !hasAnyAccess) {
     return (
-      <nav className="bg-card/50 border-b border-border backdrop-blur-sm sticky top-16 z-40">
+      <nav className="bg-card/50 border-b border-border backdrop-blur-sm sticky top-16 z-50">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-3 py-3">
             <Lock className="w-4 h-4 text-muted-foreground" />
@@ -219,7 +220,7 @@ export default function Navigation() {
   }
 
   return (
-    <nav className="bg-card/50 border-b border-border backdrop-blur-sm sticky top-16 z-40">
+    <nav className="bg-card/50 border-b border-border backdrop-blur-sm sticky top-16 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center gap-0 overflow-x-auto scrollbar-none py-0">
           {/* Core Operations */}
@@ -255,7 +256,8 @@ export default function Navigation() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="bg-popover border-border w-44"
+                sideOffset={4}
+                className="bg-popover border-border w-44 z-[100]"
               >
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-sans uppercase tracking-wide">
                   Management
@@ -296,7 +298,8 @@ export default function Navigation() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="bg-popover border-border w-44"
+                sideOffset={4}
+                className="bg-popover border-border w-44 z-[100]"
               >
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-sans uppercase tracking-wide">
                   Growth
@@ -324,6 +327,7 @@ export default function Navigation() {
                 <button
                   type="button"
                   className={navLinkClass(currentPath.startsWith("/settings"))}
+                  data-ocid="settings.button"
                 >
                   <Settings className="w-4 h-4 shrink-0" />
                   <span className="hidden md:inline">Settings</span>
@@ -335,7 +339,9 @@ export default function Navigation() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="bg-popover border-border w-48"
+                sideOffset={4}
+                className="bg-popover border-border w-52 z-[100]"
+                data-ocid="settings.dropdown_menu"
               >
                 <DropdownMenuLabel className="text-xs text-muted-foreground font-sans uppercase tracking-wide">
                   Settings
@@ -349,6 +355,7 @@ export default function Navigation() {
                     <Link
                       to="/settings/company"
                       className="cursor-pointer font-sans text-sm flex items-center gap-2"
+                      data-ocid="settings.company.link"
                     >
                       <Building2 className="w-4 h-4" />
                       Company Settings
@@ -361,6 +368,7 @@ export default function Navigation() {
                     <Link
                       to="/settings/users"
                       className="cursor-pointer font-sans text-sm flex items-center gap-2"
+                      data-ocid="settings.users.link"
                     >
                       <Users className="w-4 h-4" />
                       User Management
@@ -375,9 +383,23 @@ export default function Navigation() {
                     <Link
                       to="/settings/rates"
                       className="cursor-pointer font-sans text-sm flex items-center gap-2"
+                      data-ocid="settings.rates.link"
                     >
                       <Hotel className="w-4 h-4" />
                       Rate Management
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {/* Master Data - admin only */}
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/settings/master-data"
+                      className="cursor-pointer font-sans text-sm flex items-center gap-2"
+                      data-ocid="settings.masterdata.link"
+                    >
+                      <Database className="w-4 h-4" />
+                      Master Data
                     </Link>
                   </DropdownMenuItem>
                 )}

@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@tanstack/react-router";
 import {
   ChevronRight,
+  Download,
   Kanban,
   List,
   Loader2,
@@ -114,6 +115,32 @@ const defaultForm = {
   notes: "",
 };
 
+interface ParsedCsvRow {
+  guestName: string;
+  phone: string;
+  email: string;
+  destination: string;
+  budget: string;
+}
+
+function parseCsv(raw: string): ParsedCsvRow[] {
+  const lines = raw.trim().split("\n").filter(Boolean);
+  if (lines.length < 2) return [];
+  const rows: ParsedCsvRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    if (!cols[0]) continue;
+    rows.push({
+      guestName: cols[0] || "",
+      phone: cols[1] || "",
+      email: cols[2] || "",
+      destination: cols[3] || "",
+      budget: cols[4] || "0",
+    });
+  }
+  return rows;
+}
+
 export default function LeadsPage() {
   const { data: leads = [], isLoading } = useGetLeads();
   const { mutateAsync: createLead, isPending: isCreating } = useCreateLead();
@@ -124,6 +151,12 @@ export default function LeadsPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [draggedLeadId, setDraggedLeadId] = useState<bigint | null>(null);
+
+  // Import state
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const [parsedRows, setParsedRows] = useState<ParsedCsvRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   const update = (k: keyof typeof form, v: string) =>
     setForm((p) => ({ ...p, [k]: v }));
@@ -188,6 +221,40 @@ export default function LeadsPage() {
   const getLeadsForStage = (stageId: string) =>
     leads.filter((l) => l.stage === stageId);
 
+  const handleCsvChange = (text: string) => {
+    setCsvText(text);
+    setParsedRows(parseCsv(text));
+  };
+
+  const handleImport = async () => {
+    if (parsedRows.length === 0) {
+      toast.error("No valid rows to import");
+      return;
+    }
+    setIsImporting(true);
+    let success = 0;
+    for (const row of parsedRows) {
+      try {
+        await createLead({
+          guestName: row.guestName,
+          phone: row.phone,
+          email: row.email,
+          destination: row.destination,
+          travelDates: "",
+          budget: BigInt(Math.round(Number(row.budget) || 0)),
+          source: "Other",
+          notes: "",
+        });
+        success++;
+      } catch {}
+    }
+    setIsImporting(false);
+    toast.success(`Imported ${success} of ${parsedRows.length} leads`);
+    setShowImport(false);
+    setCsvText("");
+    setParsedRows([]);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -219,8 +286,18 @@ export default function LeadsPage() {
               </button>
             </div>
             <Button
+              variant="outline"
+              onClick={() => setShowImport(true)}
+              className="font-sans border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
+              data-ocid="leads.import.button"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Import
+            </Button>
+            <Button
               onClick={() => setShowModal(true)}
               className="gradient-gold text-sidebar font-display font-bold shadow-gold"
+              data-ocid="leads.add.primary_button"
             >
               <Plus className="w-4 h-4 mr-1" />
               Add Lead
@@ -356,6 +433,137 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Import Modal */}
+      <Dialog open={showImport} onOpenChange={setShowImport}>
+        <DialogContent
+          className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="leads.import.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display text-lg text-foreground">
+              Import Leads from CSV
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="bg-sidebar rounded-xl p-3 border border-border/50">
+              <p className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Sample CSV Format
+              </p>
+              <code className="text-xs font-mono text-teal">
+                Name,Phone,Email,Destination,Budget
+                <br />
+                Rahul Sharma,+919876543210,rahul@email.com,Goa,75000
+                <br />
+                Priya Patel,+919123456789,priya@email.com,Maldives,200000
+              </code>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-sans">Paste CSV Data</Label>
+              <Textarea
+                value={csvText}
+                onChange={(e) => handleCsvChange(e.target.value)}
+                placeholder={
+                  "Name,Phone,Email,Destination,Budget\nJohn Doe,+91XXXXXXXXXX,..."
+                }
+                rows={6}
+                className="font-mono text-xs resize-none"
+                data-ocid="leads.import.textarea"
+              />
+            </div>
+
+            {parsedRows.length > 0 && (
+              <div>
+                <p className="text-xs font-sans font-semibold text-muted-foreground mb-2">
+                  {parsedRows.length} rows detected:
+                </p>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-xs font-sans">
+                    <thead>
+                      <tr className="bg-sidebar border-b border-border">
+                        <th className="text-left px-3 py-2 text-muted-foreground">
+                          Name
+                        </th>
+                        <th className="text-left px-3 py-2 text-muted-foreground">
+                          Phone
+                        </th>
+                        <th className="text-left px-3 py-2 text-muted-foreground">
+                          Email
+                        </th>
+                        <th className="text-left px-3 py-2 text-muted-foreground">
+                          Destination
+                        </th>
+                        <th className="text-right px-3 py-2 text-muted-foreground">
+                          Budget
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedRows.slice(0, 8).map((row) => (
+                        <tr
+                          key={`${row.guestName}-${row.phone}`}
+                          className="border-b border-border/50 hover:bg-accent/20"
+                        >
+                          <td className="px-3 py-1.5 text-foreground">
+                            {row.guestName}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {row.phone}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground truncate max-w-[120px]">
+                            {row.email}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {row.destination}
+                          </td>
+                          <td className="px-3 py-1.5 text-gold text-right">
+                            ₹{Number(row.budget || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                      {parsedRows.length > 8 && (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="px-3 py-1.5 text-center text-muted-foreground"
+                          >
+                            ...and {parsedRows.length - 8} more
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowImport(false)}
+                className="flex-1 font-sans"
+                data-ocid="leads.import.cancel_button"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImport}
+                disabled={parsedRows.length === 0 || isImporting}
+                className="flex-1 gradient-gold text-sidebar font-sans font-bold shadow-gold"
+                data-ocid="leads.import.confirm_button"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Import{" "}
+                {parsedRows.length > 0 ? `${parsedRows.length} Leads` : ""}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Lead Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>

@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { CredentialSessionProvider } from "./contexts/CredentialSessionContext";
 import { InternetIdentityProvider } from "./hooks/useInternetIdentity";
 import "../index.css";
+import { CredentialSessionProvider } from "./contexts/CredentialSessionContext";
 
 BigInt.prototype.toJSON = function () {
   return this.toString();

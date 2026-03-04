@@ -1,8 +1,18 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   BarChart3,
   BookOpen,
   DollarSign,
+  Download,
   FileText,
   Loader2,
   MapPin,
@@ -12,6 +22,7 @@ import {
   Users,
   Users2,
 } from "lucide-react";
+import type { Invoice, Lead } from "../backend.d.ts";
 import {
   useGetAllInvoices,
   useGetAnalyticsSummary,
@@ -425,6 +436,362 @@ export default function AnalyticsPage() {
             </Card>
           )}
         </div>
+
+        {/* Custom Reports */}
+        <CustomReports allLeads={allLeads} allInvoices={allInvoices} />
+      </div>
+    </div>
+  );
+}
+
+// ── Custom Reports Component ──────────────────────────────────────────────────
+
+function CustomReports({
+  allLeads,
+  allInvoices,
+}: {
+  allLeads: Lead[];
+  allInvoices: Invoice[];
+}) {
+  // Revenue by Destination
+  const revenueByDestination = allLeads.reduce<Record<string, number>>(
+    (acc, l) => {
+      const dest = l.destination || "Unknown";
+      acc[dest] = (acc[dest] || 0) + Number(l.budget);
+      return acc;
+    },
+    {},
+  );
+
+  // Monthly Lead Trend
+  const monthlyLeadTrend = allLeads.reduce<Record<string, number>>((acc, l) => {
+    const date = new Date(Number(l.id) / 1_000_000);
+    const month = date.toLocaleDateString("en-IN", {
+      month: "short",
+      year: "2-digit",
+    });
+    acc[month] = (acc[month] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Stage conversion funnel
+  const STAGE_ORDER = [
+    "NewLead",
+    "Contacted",
+    "Prospect",
+    "QuotationSent",
+    "InNegotiation",
+    "ReadyToBook",
+    "PaymentAwaited",
+    "BookingConfirmed",
+    "Lost",
+    "Cancelled",
+  ];
+  const STAGE_LABELS: Record<string, string> = {
+    NewLead: "New Lead",
+    Contacted: "Contacted",
+    Prospect: "Prospect",
+    QuotationSent: "Quotation Sent",
+    InNegotiation: "In Negotiation",
+    ReadyToBook: "Ready to Book",
+    PaymentAwaited: "Payment Awaited",
+    BookingConfirmed: "Booking Confirmed",
+    Lost: "Lost",
+    Cancelled: "Cancelled",
+  };
+  const stageFunnel = STAGE_ORDER.map((s) => ({
+    stage: s,
+    count: allLeads.filter((l) => l.stage === s).length,
+  })).filter((s) => s.count > 0);
+
+  const exportCsv = (type: string) => {
+    let csv = "";
+    if (type === "destinations") {
+      csv = "Destination,Lead Count,Total Budget (INR)\n";
+      for (const [dest, budget] of Object.entries(revenueByDestination).sort(
+        (a, b) => b[1] - a[1],
+      )) {
+        const count = allLeads.filter(
+          (l) => (l.destination || "Unknown") === dest,
+        ).length;
+        csv += `"${dest}",${count},${budget}\n`;
+      }
+    } else if (type === "monthly") {
+      csv = "Month,Lead Count\n";
+      for (const [m, c] of Object.entries(monthlyLeadTrend)) {
+        csv += `"${m}",${c}\n`;
+      }
+    } else if (type === "funnel") {
+      csv = "Stage,Count\n";
+      for (const s of stageFunnel) {
+        csv += `"${STAGE_LABELS[s.stage] || s.stage}",${s.count}\n`;
+      }
+    }
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${type}_report.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-6 mt-2">
+      <div className="flex items-center gap-2">
+        <FileText className="w-5 h-5 text-gold" />
+        <h3 className="text-lg font-display font-bold text-foreground">
+          Custom Reports
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue by Destination */}
+        <Card className="premium-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-display text-base flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-teal" /> Revenue by Destination
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportCsv("destinations")}
+                className="text-xs font-sans border-border/60 text-muted-foreground hover:text-foreground"
+                data-ocid="analytics.destinations.export_button"
+              >
+                <Download className="w-3 h-3 mr-1" /> CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {Object.keys(revenueByDestination).length === 0 ? (
+              <p className="text-sm text-muted-foreground font-sans text-center py-6">
+                No data yet
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+                      Destination
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase text-right">
+                      Leads
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase text-right">
+                      Budget
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(revenueByDestination)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 8)
+                    .map(([dest, budget]) => (
+                      <TableRow
+                        key={dest}
+                        className="border-border hover:bg-accent/20"
+                      >
+                        <TableCell className="font-sans text-sm text-foreground">
+                          {dest}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground text-right">
+                          {
+                            allLeads.filter(
+                              (l) => (l.destination || "Unknown") === dest,
+                            ).length
+                          }
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-gold text-right">
+                          ₹{budget.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Monthly Lead Trend */}
+        <Card className="premium-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-display text-base flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-400" /> Monthly Lead
+                Trend
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportCsv("monthly")}
+                className="text-xs font-sans border-border/60 text-muted-foreground hover:text-foreground"
+                data-ocid="analytics.monthly.export_button"
+              >
+                <Download className="w-3 h-3 mr-1" /> CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {Object.keys(monthlyLeadTrend).length === 0 ? (
+              <p className="text-sm text-muted-foreground font-sans text-center py-6">
+                No data yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(monthlyLeadTrend).map(([month, count]) => {
+                  const max = Math.max(...Object.values(monthlyLeadTrend));
+                  return (
+                    <div key={month} className="flex items-center gap-3">
+                      <span className="w-16 text-xs font-sans text-muted-foreground shrink-0">
+                        {month}
+                      </span>
+                      <div className="flex-1 h-5 bg-card rounded overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 opacity-80 rounded flex items-center justify-end pr-2 transition-all"
+                          style={{
+                            width: `${(count / max) * 100}%`,
+                            minWidth: "1.5rem",
+                          }}
+                        >
+                          <span className="text-[10px] font-mono font-bold text-white">
+                            {count}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Stage Conversion Funnel */}
+        <Card className="premium-card">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-display text-base flex items-center gap-2">
+                <Users2 className="w-4 h-4 text-purple-400" /> Stage Conversion
+                Funnel
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportCsv("funnel")}
+                className="text-xs font-sans border-border/60 text-muted-foreground hover:text-foreground"
+                data-ocid="analytics.funnel.export_button"
+              >
+                <Download className="w-3 h-3 mr-1" /> CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {stageFunnel.length === 0 ? (
+              <p className="text-sm text-muted-foreground font-sans text-center py-6">
+                No data yet
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+                      Stage
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase text-right">
+                      Count
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase text-right">
+                      %
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stageFunnel.map((s) => (
+                    <TableRow
+                      key={s.stage}
+                      className="border-border hover:bg-accent/20"
+                    >
+                      <TableCell className="font-sans text-sm text-foreground">
+                        {STAGE_LABELS[s.stage] || s.stage}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground text-right">
+                        {s.count}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-gold text-right">
+                        {allLeads.length > 0
+                          ? Math.round((s.count / allLeads.length) * 100)
+                          : 0}
+                        %
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Invoices */}
+        <Card className="premium-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-display text-base flex items-center gap-2">
+              <FileText className="w-4 h-4 text-red-400" /> Pending Invoices
+              Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allInvoices.filter((i) => i.status !== "Paid").length === 0 ? (
+              <p className="text-sm text-muted-foreground font-sans text-center py-6">
+                All invoices paid 🎉
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+                      Invoice
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+                      Guest
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+                      Status
+                    </TableHead>
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase text-right">
+                      Amount
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allInvoices
+                    .filter((i) => i.status !== "Paid")
+                    .slice(0, 6)
+                    .map((inv) => (
+                      <TableRow
+                        key={String(inv.id)}
+                        className="border-border hover:bg-accent/20"
+                      >
+                        <TableCell className="font-mono text-xs text-gold">
+                          {inv.invoiceNumber}
+                        </TableCell>
+                        <TableCell className="font-sans text-sm text-foreground">
+                          {inv.guestName}
+                        </TableCell>
+                        <TableCell className="font-sans text-xs text-amber-400">
+                          {inv.status}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-foreground text-right">
+                          ₹{Number(inv.grandTotal).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

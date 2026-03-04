@@ -29,6 +29,7 @@ import ReviewsPage from "./pages/ReviewsPage";
 import TemplateLibraryPage from "./pages/TemplateLibraryPage";
 import VendorsPage from "./pages/VendorsPage";
 import CompanySettingsPage from "./pages/admin/CompanySettingsPage";
+import MasterDataPage from "./pages/admin/MasterDataPage";
 import RateManagementPage from "./pages/admin/RateManagementPage";
 import UserManagementPage from "./pages/admin/UserManagementPage";
 
@@ -176,6 +177,12 @@ const rateManagementRoute = createRoute({
   component: RateManagementPage,
 });
 
+const masterDataRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/settings/master-data",
+  component: MasterDataPage,
+});
+
 const itineraryRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: "/itinerary",
@@ -214,6 +221,7 @@ const routeTree = rootRoute.addChildren([
     companySettingsRoute,
     userManagementRoute,
     rateManagementRoute,
+    masterDataRoute,
     // New pages
     itineraryRoute,
     quickQuoteRoute,

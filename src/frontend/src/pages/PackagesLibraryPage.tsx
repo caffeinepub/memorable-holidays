@@ -12,7 +12,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Calendar,
@@ -24,6 +39,7 @@ import {
   FolderOpen,
   Loader2,
   PlusCircle,
+  Scale,
   Search,
   Trash2,
   Users,
@@ -54,6 +70,25 @@ export default function PackagesLibraryPage() {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [showCompare, setShowCompare] = useState(false);
+
+  const toggleCompare = (id: string) => {
+    setCompareIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < 3) {
+        next.add(id);
+      } else {
+        return prev;
+      }
+      return next;
+    });
+  };
+
+  const comparePkgs = packages.filter((p) => compareIds.has(String(p.id)));
 
   const categories = Array.from(new Set(packages.map((p) => p.category)));
 
@@ -125,8 +160,21 @@ export default function PackagesLibraryPage() {
               </p>
             </div>
             <Button
+              variant="outline"
+              onClick={() => {
+                setCompareMode((m) => !m);
+                if (compareMode) setCompareIds(new Set());
+              }}
+              className={`font-sans ${compareMode ? "border-gold/60 text-gold bg-gold/10" : "border-border/60 text-muted-foreground hover:text-foreground"}`}
+              data-ocid="packages.compare.toggle"
+            >
+              <Scale className="w-4 h-4 mr-2" />
+              {compareMode ? "Exit Compare" : "Compare"}
+            </Button>
+            <Button
               onClick={() => navigate({ to: "/categories" })}
               className="gradient-gold text-sidebar font-display font-bold shadow-gold hover:shadow-glow-gold transition-all"
+              data-ocid="packages.new.primary_button"
             >
               <PlusCircle className="w-4 h-4 mr-2" />
               New Package
@@ -205,16 +253,26 @@ export default function PackagesLibraryPage() {
             {filtered.map((pkg) => (
               <Card
                 key={String(pkg.id)}
-                className="premium-card hover:border-gold/40 hover:shadow-gold transition-all duration-300 group"
+                className={`premium-card hover:border-gold/40 hover:shadow-gold transition-all duration-300 group ${compareMode && compareIds.has(String(pkg.id)) ? "ring-2 ring-gold/60" : ""}`}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <Badge
-                      variant="outline"
-                      className="font-sans text-xs border-teal/30 text-teal bg-teal/5"
-                    >
-                      {pkg.category}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {compareMode && (
+                        <Checkbox
+                          checked={compareIds.has(String(pkg.id))}
+                          onCheckedChange={() => toggleCompare(String(pkg.id))}
+                          className="border-gold/50 data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                          data-ocid="packages.compare.checkbox"
+                        />
+                      )}
+                      <Badge
+                        variant="outline"
+                        className="font-sans text-xs border-teal/30 text-teal bg-teal/5"
+                      >
+                        {pkg.category}
+                      </Badge>
+                    </div>
                     <span className="text-base font-display font-bold text-gold">
                       ₹{Number(pkg.totalCost).toLocaleString()}
                     </span>
@@ -339,6 +397,111 @@ export default function PackagesLibraryPage() {
           </div>
         )}
       </div>
+
+      {/* Floating Compare Button */}
+      {compareMode && compareIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+          <Button
+            onClick={() => setShowCompare(true)}
+            className="gradient-gold text-sidebar font-display font-bold shadow-gold px-6 py-2.5 text-sm"
+            data-ocid="packages.compare.primary_button"
+          >
+            <Scale className="w-4 h-4 mr-2" />
+            Compare ({compareIds.size})
+          </Button>
+        </div>
+      )}
+
+      {/* Compare Dialog */}
+      <Dialog open={showCompare} onOpenChange={setShowCompare}>
+        <DialogContent
+          className="bg-card border-border max-w-5xl max-h-[90vh] overflow-y-auto"
+          data-ocid="packages.compare.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display text-lg">
+              Package Comparison
+            </DialogTitle>
+          </DialogHeader>
+          {comparePkgs.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="font-sans text-xs text-muted-foreground uppercase w-32">
+                      Field
+                    </TableHead>
+                    {comparePkgs.map((p) => (
+                      <TableHead
+                        key={String(p.id)}
+                        className="font-sans text-xs font-semibold text-foreground"
+                      >
+                        {p.guest.name}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[
+                    {
+                      label: "Category",
+                      fn: (p: (typeof comparePkgs)[0]) => p.category,
+                    },
+                    {
+                      label: "Destination",
+                      fn: (p: (typeof comparePkgs)[0]) =>
+                        p.guest.travelDates
+                          ? `Travel: ${p.guest.travelDates}`
+                          : "–",
+                    },
+                    {
+                      label: "Adults",
+                      fn: (p: (typeof comparePkgs)[0]) =>
+                        String(Number(p.guest.adults)),
+                    },
+                    {
+                      label: "Children",
+                      fn: (p: (typeof comparePkgs)[0]) =>
+                        String(Number(p.guest.children)),
+                    },
+                    {
+                      label: "Travel Dates",
+                      fn: (p: (typeof comparePkgs)[0]) =>
+                        p.guest.travelDates || "–",
+                    },
+                    {
+                      label: "Hotel",
+                      fn: (p: (typeof comparePkgs)[0]) => p.hotel || "–",
+                    },
+                    {
+                      label: "Total Cost",
+                      fn: (p: (typeof comparePkgs)[0]) =>
+                        `₹${Number(p.totalCost).toLocaleString()}`,
+                    },
+                  ].map((row) => (
+                    <TableRow
+                      key={row.label}
+                      className="border-border hover:bg-accent/20"
+                    >
+                      <TableCell className="font-sans text-xs text-muted-foreground font-semibold uppercase tracking-wide">
+                        {row.label}
+                      </TableCell>
+                      {comparePkgs.map((p) => (
+                        <TableCell
+                          key={String(p.id)}
+                          className={`font-sans text-sm ${row.label === "Total Cost" ? "text-gold font-mono font-bold" : "text-foreground"}`}
+                        >
+                          {row.fn(p)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

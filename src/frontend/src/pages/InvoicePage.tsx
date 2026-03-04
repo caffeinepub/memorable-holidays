@@ -25,6 +25,7 @@ import {
   Loader2,
   Plus,
   Printer,
+  Receipt,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -54,6 +55,7 @@ export default function InvoicePage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
   const [guestName, setGuestName] = useState("");
   const [packageId] = useState("0");
   const [taxPercent, setTaxPercent] = useState("18");
@@ -348,15 +350,28 @@ export default function InvoicePage() {
                             onClick={() => setViewInvoice(inv)}
                             className="text-muted-foreground hover:text-gold transition-colors"
                             title="View"
+                            data-ocid="invoices.view.button"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
+                          {inv.status === "Paid" && (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptInvoice(inv)}
+                              className="text-muted-foreground hover:text-green-400 transition-colors"
+                              title="View Receipt"
+                              data-ocid="invoices.receipt.button"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {inv.status !== "Paid" && (
                             <button
                               type="button"
                               onClick={() => handleMarkPaid(inv.id)}
                               className="text-muted-foreground hover:text-green-400 transition-colors"
-                              title="Mark Paid"
+                              title="Mark as Paid"
+                              data-ocid="invoices.markpaid.button"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
@@ -537,6 +552,100 @@ export default function InvoicePage() {
             </Button>
           </div>
         </DialogContent>
+      </Dialog>
+
+      {/* Receipt Dialog */}
+      <Dialog
+        open={!!receiptInvoice}
+        onOpenChange={() => setReceiptInvoice(null)}
+      >
+        {receiptInvoice && (
+          <DialogContent
+            className="bg-card border-border max-w-md"
+            data-ocid="invoices.receipt.dialog"
+          >
+            <DialogHeader>
+              <DialogTitle className="font-display text-lg text-foreground flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-gold" />
+                Payment Receipt
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <div className="bg-sidebar rounded-xl p-4 border border-green-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-display font-bold text-lg text-foreground">
+                      {companySettings?.companyName || "Memorable Holidays"}
+                    </p>
+                    {companySettings?.address && (
+                      <p className="text-xs text-muted-foreground font-sans">
+                        {companySettings.address}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center">
+                    <Check className="w-5 h-5 text-green-400" />
+                  </div>
+                </div>
+                <div className="border-t border-border pt-3 space-y-2 text-sm font-sans">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Receipt No.</span>
+                    <span className="font-mono text-gold">
+                      REC-{receiptInvoice.invoiceNumber}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Invoice No.</span>
+                    <span className="font-mono text-foreground">
+                      {receiptInvoice.invoiceNumber}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Guest</span>
+                    <span className="text-foreground font-semibold">
+                      {receiptInvoice.guestName}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Issue Date</span>
+                    <span className="text-foreground">
+                      {formatDate(receiptInvoice.issuedDate)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-2 mt-2">
+                    <span className="font-semibold text-foreground">
+                      Amount Paid
+                    </span>
+                    <span className="font-display font-bold text-green-400 text-lg">
+                      ₹{Number(receiptInvoice.grandTotal).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 text-center">
+                  <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full px-3 py-1 text-xs font-sans font-semibold">
+                    <Check className="w-3 h-3" /> PAID
+                  </span>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  const w = window.open("", "_blank", "width=500,height=600");
+                  if (!w) return;
+                  w.document.write(
+                    `<!DOCTYPE html><html><head><title>Receipt REC-${receiptInvoice.invoiceNumber}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111;max-width:480px;margin:0 auto}.header{text-align:center;margin-bottom:20px}.co-name{font-size:20px;font-weight:700}.rec-num{font-size:14px;color:#666;margin-top:4px}.paid-badge{background:#d1fae5;color:#065f46;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;display:inline-block;margin:8px 0}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;font-size:13px}.total-row{display:flex;justify-content:space-between;padding:10px 0;font-size:16px;font-weight:700}@media print{body{padding:0}}</style></head><body><div class="header"><div class="co-name">${companySettings?.companyName || "Memorable Holidays"}</div><div class="rec-num">Receipt No: REC-${receiptInvoice.invoiceNumber}</div><div class="paid-badge">✓ PAID</div></div><div class="row"><span>Guest</span><span><b>${receiptInvoice.guestName}</b></span></div><div class="row"><span>Invoice</span><span>${receiptInvoice.invoiceNumber}</span></div><div class="row"><span>Date</span><span>${formatDate(receiptInvoice.issuedDate)}</span></div><div class="total-row"><span>Amount Paid</span><span style="color:#059669">₹${Number(receiptInvoice.grandTotal).toLocaleString()}</span></div><script>window.onload=function(){window.print();window.close()}<\/script></body></html>`,
+                  );
+                  w.document.close();
+                }}
+                className="w-full font-sans border-border/60 text-foreground hover:border-border"
+                variant="outline"
+                data-ocid="invoices.receipt.print_button"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Print Receipt
+              </Button>
+            </div>
+          </DialogContent>
+        )}
       </Dialog>
 
       {/* View Invoice Modal */}
