@@ -14,10 +14,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Sora', 'system-ui', 'sans-serif'],
-        display: ['Cabinet Grotesk', 'Sora', 'system-ui', 'sans-serif'],
-        serif: ['Cabinet Grotesk', 'Georgia', 'serif'],
-        mono: ['Geist Mono', 'monospace'],
+        sans: ['Sora', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['DM Serif Display', 'Sora', 'Georgia', 'serif'],
+        serif: ['DM Serif Display', 'Georgia', 'serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
         border: 'oklch(var(--border))',
