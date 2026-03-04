@@ -57,6 +57,24 @@ const categories = [
     desc: "Luxury ocean & river cruises",
     color: "from-blue-900/50 to-teal/20",
   },
+  {
+    name: "Hill Station",
+    image: "/assets/generated/category-hillstation.dim_128x128.png",
+    desc: "Cool mountain retreats & misty valleys",
+    color: "from-emerald-900/50 to-green-800/30",
+  },
+  {
+    name: "Backpacking",
+    image: "/assets/generated/category-backpacking.dim_128x128.png",
+    desc: "Budget adventures & trail exploration",
+    color: "from-amber-900/50 to-orange-800/30",
+  },
+  {
+    name: "Heritage",
+    image: "/assets/generated/category-cultural.dim_128x128.png",
+    desc: "UNESCO sites & historical wonders",
+    color: "from-yellow-900/50 to-gold/20",
+  },
 ];
 
 export default function CategorySelectionPage() {
@@ -82,7 +100,7 @@ export default function CategorySelectionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 max-w-4xl">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 max-w-5xl">
         {categories.map(({ name, image, desc, color }) => (
           <button
             key={name}

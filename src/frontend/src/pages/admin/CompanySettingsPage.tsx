@@ -322,6 +322,7 @@ export default function CompanySettingsPage() {
             onClick={handleSave}
             disabled={isSaving}
             className="w-full gradient-gold text-sidebar font-display font-bold py-3 text-base shadow-gold"
+            data-ocid="company-settings.save_button"
           >
             {isSaving ? (
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
