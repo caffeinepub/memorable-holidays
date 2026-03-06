@@ -27,7 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Principal } from "@dfinity/principal";
-import { useNavigate } from "@tanstack/react-router";
+
 import {
   Check,
   ChevronDown,
@@ -52,7 +52,6 @@ import { useActor } from "../../hooks/useActor";
 import {
   useCreateCredentialUser,
   useDeleteCredentialUser,
-  useGetCallerUserProfile,
   useGetUserPrivileges,
   useListCredentialUsers,
   useResetCredentialPassword,
@@ -451,10 +450,7 @@ function UserRow({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function UserManagementPage() {
-  const { data: userProfile } = useGetCallerUserProfile();
   const { actor } = useActor();
-  const navigate = useNavigate();
-  const isAdmin = userProfile?.role === "admin";
 
   // Queries
   const { data: credentialUsers = [], isLoading: usersLoading } =
@@ -504,14 +500,6 @@ export default function UserManagementPage() {
   const [principalId, setPrincipalId] = useState("");
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.user);
   const [isAssigning, setIsAssigning] = useState(false);
-
-  useEffect(() => {
-    if (userProfile && !isAdmin) {
-      navigate({ to: "/" });
-    }
-  }, [userProfile, isAdmin, navigate]);
-
-  if (!isAdmin) return null;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 

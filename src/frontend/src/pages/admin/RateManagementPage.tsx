@@ -22,7 +22,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "@tanstack/react-router";
 import {
   Anchor,
   Car,
@@ -37,7 +36,7 @@ import {
   Waves,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { HotelRate, RateOption } from "../../backend";
 import {
@@ -58,7 +57,6 @@ import {
   useGetAllBoatingRates,
   useGetAllFoodRates,
   useGetAllTravelRates,
-  useGetCallerUserProfile,
   useGetHotelRates,
   useUpdateHotelRate,
 } from "../../hooks/useQueries";
@@ -627,16 +625,6 @@ function HotelsTab() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function RateManagementPage() {
-  const { data: userProfile } = useGetCallerUserProfile();
-  const navigate = useNavigate();
-  const isAdmin = userProfile?.role === "admin";
-
-  useEffect(() => {
-    if (userProfile && !isAdmin) {
-      navigate({ to: "/" });
-    }
-  }, [userProfile, isAdmin, navigate]);
-
   // Food
   const { data: foodRates = [], isLoading: loadingFood } = useGetAllFoodRates();
   const { mutateAsync: addFood, isPending: addingFood } =
@@ -706,8 +694,6 @@ export default function RateManagementPage() {
       }
     },
   });
-
-  if (!isAdmin) return null;
 
   return (
     <div className="container mx-auto px-4 py-8 animate-fade-in">

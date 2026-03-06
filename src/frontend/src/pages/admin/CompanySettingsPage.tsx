@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { useNavigate } from "@tanstack/react-router";
 import {
   Building2,
   Facebook,
@@ -28,7 +27,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { CompanySettings } from "../../backend.d.ts";
 import {
-  useGetCallerUserProfile,
   useGetCompanySettings,
   useSaveCompanySettings,
 } from "../../hooks/useQueries";
@@ -50,20 +48,12 @@ const defaultSettings: CompanySettings = {
 };
 
 export default function CompanySettingsPage() {
-  const { data: userProfile } = useGetCallerUserProfile();
-  const navigate = useNavigate();
-  const isAdmin = userProfile?.role === "admin";
-
   const { data: backendSettings, isLoading } = useGetCompanySettings();
   const { mutateAsync: saveSettings, isPending: isSaving } =
     useSaveCompanySettings();
 
   const [settings, setSettings] = useState<CompanySettings>(defaultSettings);
   const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    if (userProfile && !isAdmin) navigate({ to: "/" });
-  }, [userProfile, isAdmin, navigate]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -114,8 +104,6 @@ export default function CompanySettingsPage() {
       toast.error("Failed to save settings");
     }
   };
-
-  if (!isAdmin) return null;
 
   if (isLoading || !isReady) {
     return (
