@@ -17,7 +17,6 @@ import {
   Calendar,
   Copy,
   ExternalLink,
-  Loader2,
   Mail,
   MapPin,
   MessageCircle,
@@ -35,6 +34,90 @@ import {
   useGetCompanySettings,
   useGetHotelRates,
 } from "../hooks/useQueries";
+import { masterDataStore } from "../lib/masterDataStore";
+
+// ─── Destination rates from localStorage ─────────────────────────────────────
+
+const DEST_RATES_KEY = "mh_destination_rates";
+
+interface DestinationRate {
+  destinationId: string;
+  destinationName: string;
+  islandGroup: string;
+  entryFee: number;
+  permitFee: number;
+  guideFee: number;
+  ferryCharge: number;
+  notes: string;
+}
+
+function loadDestinationRates(): Record<string, DestinationRate> {
+  try {
+    const stored = localStorage.getItem(DEST_RATES_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+// ─── Guest Category Input ─────────────────────────────────────────────────────
+
+interface GuestCounterProps {
+  label: string;
+  icon: string;
+  value: number;
+  min?: number;
+  onChange: (v: number) => void;
+  ocid: string;
+}
+
+function GuestCounter({
+  label,
+  icon,
+  value,
+  min = 0,
+  onChange,
+  ocid,
+}: GuestCounterProps) {
+  return (
+    <div className="flex items-center justify-between gap-2 bg-sidebar/50 rounded-lg px-3 py-2 border border-border/40">
+      <div className="flex items-center gap-2">
+        <span className="text-base">{icon}</span>
+        <Label className="text-xs font-sans text-foreground cursor-pointer">
+          {label}
+        </Label>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="w-6 h-6 rounded-md border border-border/50 text-muted-foreground hover:text-foreground hover:border-gold/50 transition-colors flex items-center justify-center text-sm font-bold"
+        >
+          −
+        </button>
+        <Input
+          type="number"
+          min={min}
+          value={value}
+          onChange={(e) =>
+            onChange(Math.max(min, Number.parseInt(e.target.value) || 0))
+          }
+          className="w-12 h-6 font-mono text-sm text-center p-0 border-none bg-transparent focus-visible:ring-0"
+          data-ocid={ocid}
+        />
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          className="w-6 h-6 rounded-md border border-border/50 text-muted-foreground hover:text-foreground hover:border-gold/50 transition-colors flex items-center justify-center text-sm font-bold"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function QuickQuotePage() {
   const { data: hotelRates = [] } = useGetHotelRates();
@@ -44,16 +127,31 @@ export default function QuickQuotePage() {
   const { data: boatingRates = [] } = useGetAllBoatingRates();
   const { data: companySettings } = useGetCompanySettings();
 
-  const [destination, setDestination] = useState("");
+  // All master data destinations (for Andaman grouped dropdown)
+  const allDestinations = useMemo(() => masterDataStore.get().destinations, []);
+  const destinationRates = useMemo(() => loadDestinationRates(), []);
+
+  const [selectedDestId, setSelectedDestId] = useState("");
   const [travelDates, setTravelDates] = useState("");
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
+  const [nights, setNights] = useState(3);
+
+  // ── Detailed guest categories ─────────────────────────────────────────────
+  const [maleAdults, setMaleAdults] = useState(1);
+  const [femaleAdults, setFemaleAdults] = useState(1);
+  const [tgAdults, setTgAdults] = useState(0);
+  const [kids, setKids] = useState(0); // age 5–12, 60% adult rate
+  const [infants, setInfants] = useState(0); // age 0–4, flat ₹500 each
+
   const [selectedHotel, setSelectedHotel] = useState("");
   const [selectedRoomType, setSelectedRoomType] = useState("");
   const [selectedFood, setSelectedFood] = useState("");
   const [selectedTravel, setSelectedTravel] = useState("");
   const [selectedBoating, setSelectedBoating] = useState("");
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+
+  // Derived counts
+  const totalAdults = maleAdults + femaleAdults + tgAdults;
+  const totalGuests = totalAdults + kids + infants;
 
   // Unique hotel names
   const hotelNames = useMemo(
@@ -111,18 +209,38 @@ export default function QuickQuotePage() {
     [activityRates, selectedActivities],
   );
 
-  // Cost calculation: baseRate * adults + Math.floor(baseRate * children / 2)
+  // ── Cost calculation with detailed guest categories ───────────────────────
+  // Adults pay full rate, kids pay 60%, infants pay flat ₹500 each
   const calculateForGuests = (baseRate: number): number => {
-    return baseRate * adults + Math.floor((baseRate * children) / 2);
+    return (
+      baseRate * totalAdults + Math.floor(baseRate * 0.6) * kids + 500 * infants
+    );
   };
 
-  const hotelTotal = calculateForGuests(hotelRate);
+  const hotelTotal = calculateForGuests(hotelRate) * nights;
   const foodTotal = calculateForGuests(foodRate);
   const travelTotal = calculateForGuests(travelRate);
   const boatingTotal = calculateForGuests(boatingRate);
   const activitiesTotal = calculateForGuests(activityTotal);
+
+  // Destination fees (entry + permit + ferry) per person × total adults + kids
+  const selectedDestination = allDestinations.find(
+    (d) => d.id === selectedDestId,
+  );
+  const destRate = selectedDestId ? destinationRates[selectedDestId] : null;
+  const destFeesTotal = destRate
+    ? (destRate.entryFee + destRate.permitFee + destRate.ferryCharge) *
+        (totalAdults + kids) +
+      destRate.guideFee
+    : 0;
+
   const grandTotal =
-    hotelTotal + foodTotal + travelTotal + boatingTotal + activitiesTotal;
+    hotelTotal +
+    foodTotal +
+    travelTotal +
+    boatingTotal +
+    activitiesTotal +
+    destFeesTotal;
 
   const toggleActivity = (name: string) => {
     setSelectedActivities((prev) =>
@@ -139,16 +257,43 @@ export default function QuickQuotePage() {
   const companyWhatsApp = companySettings?.whatsapp || "";
   const companyEmail = companySettings?.email || "";
 
+  // Group destinations by island group for the dropdown
+  const groupedDestinations = useMemo(() => {
+    return allDestinations.reduce<Record<string, typeof allDestinations>>(
+      (acc, d) => {
+        const group = d.islandGroup || "Other";
+        if (!acc[group]) acc[group] = [];
+        acc[group].push(d);
+        return acc;
+      },
+      {},
+    );
+  }, [allDestinations]);
+
   const buildQuoteText = () => {
+    const destName = selectedDestination?.name || "";
     const lines = [
       `🌟 *${companyName}* — Quick Quote`,
       "",
-      destination ? `📍 Destination: ${destination}` : "",
+      destName ? `📍 Destination: ${destName}` : "",
+      selectedDestination?.islandGroup
+        ? `🏝️ Island Group: ${selectedDestination.islandGroup}`
+        : "",
       travelDates ? `📅 Travel Dates: ${travelDates}` : "",
-      `👥 Guests: ${adults} Adult${adults !== 1 ? "s" : ""}${children > 0 ? `, ${children} Child${children !== 1 ? "ren" : ""}` : ""}`,
+      nights > 0
+        ? `🌙 Duration: ${nights} Night${nights !== 1 ? "s" : ""}`
+        : "",
+      "",
+      "👥 *Guest Details:*",
+      maleAdults > 0 ? `  ♂ Male Adults: ${maleAdults}` : "",
+      femaleAdults > 0 ? `  ♀ Female Adults: ${femaleAdults}` : "",
+      tgAdults > 0 ? `  ⚧ TG/Others: ${tgAdults}` : "",
+      kids > 0 ? `  👧 Kids (5–12 yrs): ${kids}` : "",
+      infants > 0 ? `  🍼 Infants (0–4 yrs): ${infants}` : "",
+      `  📊 Total: ${totalGuests} person${totalGuests !== 1 ? "s" : ""}`,
       "",
       selectedHotel
-        ? `🏨 Hotel: ${selectedHotel}${selectedRoomType ? ` (${selectedRoomType})` : ""} — ₹${hotelTotal.toLocaleString()}`
+        ? `🏨 Hotel: ${selectedHotel}${selectedRoomType ? ` (${selectedRoomType})` : ""} × ${nights}N — ₹${hotelTotal.toLocaleString()}`
         : "",
       selectedFood
         ? `🍽️ Food Package: ${selectedFood} — ₹${foodTotal.toLocaleString()}`
@@ -162,8 +307,14 @@ export default function QuickQuotePage() {
       selectedBoating
         ? `⛵ Boating: ${selectedBoating} — ₹${boatingTotal.toLocaleString()}`
         : "",
+      destFeesTotal > 0
+        ? `🎫 Destination Fees (Entry/Ferry/Permit): ₹${destFeesTotal.toLocaleString()}`
+        : "",
       grandTotal > 0 ? "" : "",
       grandTotal > 0 ? `💰 *TOTAL: ₹${grandTotal.toLocaleString()}*` : "",
+      totalGuests > 1 && grandTotal > 0
+        ? `   (₹${Math.round(grandTotal / totalGuests).toLocaleString()} per person approx.)`
+        : "",
       companyWhatsApp ? `\n📱 WhatsApp: ${companyWhatsApp}` : "",
       companyEmail ? `✉️ Email: ${companyEmail}` : "",
     ];
@@ -185,7 +336,7 @@ export default function QuickQuotePage() {
 
   const handleEmail = () => {
     const subject = encodeURIComponent(
-      `Quick Quote — ${destination || "Travel Package"} (₹${grandTotal.toLocaleString()})`,
+      `Quick Quote — ${selectedDestination?.name || "Andaman Package"} (₹${grandTotal.toLocaleString()})`,
     );
     const body = encodeURIComponent(buildQuoteText().replace(/\*/g, ""));
     window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
@@ -205,7 +356,8 @@ export default function QuickQuotePage() {
             </h2>
           </div>
           <p className="text-sm text-muted-foreground font-sans">
-            Instantly calculate and share tour package pricing
+            Instantly calculate and share tour package pricing for Andaman &amp;
+            Nicobar Islands
           </p>
         </div>
       </div>
@@ -228,7 +380,7 @@ export default function QuickQuotePage() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left: Inputs */}
           <div className="xl:col-span-2 space-y-4">
-            {/* Trip Info */}
+            {/* Trip Information */}
             <Card className="premium-card">
               <CardHeader className="pb-3">
                 <CardTitle className="font-display text-base flex items-center gap-2">
@@ -237,16 +389,71 @@ export default function QuickQuotePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-sans">Destination</Label>
-                    <Input
-                      value={destination}
-                      onChange={(e) => setDestination(e.target.value)}
-                      placeholder="Goa, Kerala, Maldives..."
+                {/* Destination Dropdown — Andaman grouped */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-sans">
+                    Destination / Tourist Spot
+                  </Label>
+                  <Select
+                    value={selectedDestId}
+                    onValueChange={setSelectedDestId}
+                  >
+                    <SelectTrigger
                       className="font-sans text-sm"
-                    />
-                  </div>
+                      data-ocid="quote.destination.select"
+                    >
+                      <SelectValue placeholder="Select Andaman destination..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-80">
+                      {Object.entries(groupedDestinations).map(
+                        ([group, dests]) => (
+                          <div key={group}>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b border-border/30 bg-sidebar/40">
+                              🏝️ {group}
+                            </div>
+                            {dests.map((d) => (
+                              <SelectItem
+                                key={d.id}
+                                value={d.id}
+                                className="font-sans text-sm pl-5"
+                              >
+                                {d.name}
+                                {destinationRates[d.id] && (
+                                  <span className="ml-1 text-[10px] text-teal">
+                                    ★ fees
+                                  </span>
+                                )}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {selectedDestination && (
+                    <p className="text-xs text-muted-foreground font-sans mt-1">
+                      🏝️ {selectedDestination.islandGroup} ·{" "}
+                      {selectedDestination.popularMonths}
+                    </p>
+                  )}
+                  {destRate && destFeesTotal > 0 && (
+                    <div className="flex items-center gap-2 bg-teal/5 border border-teal/20 rounded-lg px-3 py-1.5 mt-1">
+                      <span className="text-xs text-teal font-sans">
+                        🎫 Destination fees auto-applied: Entry ₹
+                        {destRate.entryFee} + Ferry ₹{destRate.ferryCharge}
+                        {destRate.permitFee > 0
+                          ? ` + Permit ₹${destRate.permitFee}`
+                          : ""}
+                        {destRate.guideFee > 0
+                          ? ` + Guide ₹${destRate.guideFee}`
+                          : ""}{" "}
+                        per relevant guest
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs font-sans">Travel Dates</Label>
                     <div className="relative">
@@ -256,42 +463,123 @@ export default function QuickQuotePage() {
                         onChange={(e) => setTravelDates(e.target.value)}
                         placeholder="Dec 20–27, 2025"
                         className="pl-9 font-sans text-sm"
+                        data-ocid="quote.dates.input"
                       />
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs font-sans flex items-center gap-1">
-                      <Users className="w-3 h-3" /> Adults
+                    <Label className="text-xs font-sans">
+                      Number of Nights
                     </Label>
                     <Input
                       type="number"
                       min={1}
-                      value={adults}
+                      value={nights}
                       onChange={(e) =>
-                        setAdults(
+                        setNights(
                           Math.max(1, Number.parseInt(e.target.value) || 1),
                         )
                       }
                       className="font-sans text-sm"
+                      data-ocid="quote.nights.input"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-sans flex items-center gap-1">
-                      <Users className="w-3 h-3" /> Children
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={children}
-                      onChange={(e) =>
-                        setChildren(
-                          Math.max(0, Number.parseInt(e.target.value) || 0),
-                        )
-                      }
-                      className="font-sans text-sm"
-                    />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Guest Categories */}
+            <Card className="premium-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="font-display text-base flex items-center gap-2">
+                  <Users className="w-4 h-4 text-gold" />
+                  Guest Details
+                  {totalGuests > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="ml-auto text-xs font-sans border-gold/40 text-gold"
+                    >
+                      {totalGuests} Guest{totalGuests !== 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <GuestCounter
+                    label="Male Adults"
+                    icon="♂"
+                    value={maleAdults}
+                    min={0}
+                    onChange={setMaleAdults}
+                    ocid="quote.male_adults.input"
+                  />
+                  <GuestCounter
+                    label="Female Adults"
+                    icon="♀"
+                    value={femaleAdults}
+                    min={0}
+                    onChange={setFemaleAdults}
+                    ocid="quote.female_adults.input"
+                  />
+                  <GuestCounter
+                    label="TG / Others"
+                    icon="⚧"
+                    value={tgAdults}
+                    min={0}
+                    onChange={setTgAdults}
+                    ocid="quote.tg_adults.input"
+                  />
+                  <GuestCounter
+                    label="Kids (5–12 yrs)"
+                    icon="👧"
+                    value={kids}
+                    min={0}
+                    onChange={setKids}
+                    ocid="quote.kids.input"
+                  />
+                  <GuestCounter
+                    label="Infants (0–4 yrs)"
+                    icon="🍼"
+                    value={infants}
+                    min={0}
+                    onChange={setInfants}
+                    ocid="quote.infants.input"
+                  />
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-sidebar/50 rounded-lg py-2 px-3">
+                    <p className="text-xs text-muted-foreground font-sans">
+                      Adults
+                    </p>
+                    <p className="text-lg font-display font-bold text-foreground">
+                      {totalAdults}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-sans">
+                      Full rate
+                    </p>
+                  </div>
+                  <div className="bg-sidebar/50 rounded-lg py-2 px-3">
+                    <p className="text-xs text-muted-foreground font-sans">
+                      Kids
+                    </p>
+                    <p className="text-lg font-display font-bold text-teal">
+                      {kids}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-sans">
+                      60% rate
+                    </p>
+                  </div>
+                  <div className="bg-sidebar/50 rounded-lg py-2 px-3">
+                    <p className="text-xs text-muted-foreground font-sans">
+                      Infants
+                    </p>
+                    <p className="text-lg font-display font-bold text-gold">
+                      {infants}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-sans">
+                      ₹500 flat
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -323,7 +611,10 @@ export default function QuickQuotePage() {
                           setSelectedRoomType("");
                         }}
                       >
-                        <SelectTrigger className="font-sans text-sm">
+                        <SelectTrigger
+                          className="font-sans text-sm"
+                          data-ocid="quote.hotel.select"
+                        >
                           <SelectValue placeholder="Select hotel..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -346,7 +637,10 @@ export default function QuickQuotePage() {
                         onValueChange={setSelectedRoomType}
                         disabled={!selectedHotel}
                       >
-                        <SelectTrigger className="font-sans text-sm">
+                        <SelectTrigger
+                          className="font-sans text-sm"
+                          data-ocid="quote.roomtype.select"
+                        >
                           <SelectValue placeholder="Select room..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -366,9 +660,9 @@ export default function QuickQuotePage() {
                 )}
                 {hotelRate > 0 && (
                   <p className="text-xs text-gold font-mono">
-                    Base rate: ₹{hotelRate.toLocaleString()} / person →{" "}
+                    Base rate: ₹{hotelRate.toLocaleString()} / person/night →{" "}
                     <span className="font-bold">
-                      ₹{hotelTotal.toLocaleString()} total
+                      ₹{hotelTotal.toLocaleString()} for {nights}N
                     </span>
                   </p>
                 )}
@@ -395,7 +689,10 @@ export default function QuickQuotePage() {
                         value={selectedFood}
                         onValueChange={setSelectedFood}
                       >
-                        <SelectTrigger className="font-sans text-sm">
+                        <SelectTrigger
+                          className="font-sans text-sm"
+                          data-ocid="quote.food.select"
+                        >
                           <SelectValue placeholder="Select food..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -423,7 +720,10 @@ export default function QuickQuotePage() {
                         value={selectedTravel}
                         onValueChange={setSelectedTravel}
                       >
-                        <SelectTrigger className="font-sans text-sm">
+                        <SelectTrigger
+                          className="font-sans text-sm"
+                          data-ocid="quote.travel.select"
+                        >
                           <SelectValue placeholder="Select transport..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -469,6 +769,7 @@ export default function QuickQuotePage() {
                             onCheckedChange={() =>
                               toggleActivity(activity.name)
                             }
+                            data-ocid="quote.activity.checkbox"
                           />
                           <label
                             htmlFor={`activity-${activity.name}`}
@@ -492,7 +793,10 @@ export default function QuickQuotePage() {
                       value={selectedBoating}
                       onValueChange={setSelectedBoating}
                     >
-                      <SelectTrigger className="font-sans text-sm max-w-xs">
+                      <SelectTrigger
+                        className="font-sans text-sm max-w-xs"
+                        data-ocid="quote.boating.select"
+                      >
                         <SelectValue placeholder="Select boating option..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -536,27 +840,79 @@ export default function QuickQuotePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Guest Info */}
-                  <div className="bg-sidebar/60 rounded-lg p-3 space-y-1">
-                    <div className="flex items-center gap-2 text-sm font-sans">
-                      <Users className="w-3.5 h-3.5 text-teal" />
-                      <span className="text-foreground">
-                        {adults} Adult{adults !== 1 ? "s" : ""}
-                        {children > 0
-                          ? ` + ${children} Child${children !== 1 ? "ren" : ""}`
-                          : ""}
+                  {/* Guest Breakdown */}
+                  <div className="bg-sidebar/60 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-sans font-semibold text-muted-foreground uppercase tracking-wide">
+                      Guest Breakdown
+                    </p>
+                    {maleAdults > 0 && (
+                      <div className="flex items-center justify-between text-xs font-sans">
+                        <span className="text-muted-foreground">
+                          ♂ Male Adults
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {maleAdults}
+                        </span>
+                      </div>
+                    )}
+                    {femaleAdults > 0 && (
+                      <div className="flex items-center justify-between text-xs font-sans">
+                        <span className="text-muted-foreground">
+                          ♀ Female Adults
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {femaleAdults}
+                        </span>
+                      </div>
+                    )}
+                    {tgAdults > 0 && (
+                      <div className="flex items-center justify-between text-xs font-sans">
+                        <span className="text-muted-foreground">
+                          ⚧ TG/Others
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {tgAdults}
+                        </span>
+                      </div>
+                    )}
+                    {kids > 0 && (
+                      <div className="flex items-center justify-between text-xs font-sans">
+                        <span className="text-muted-foreground">
+                          👧 Kids (5–12)
+                        </span>
+                        <span className="text-teal font-medium">
+                          {kids} × 60%
+                        </span>
+                      </div>
+                    )}
+                    {infants > 0 && (
+                      <div className="flex items-center justify-between text-xs font-sans">
+                        <span className="text-muted-foreground">
+                          🍼 Infants
+                        </span>
+                        <span className="text-gold font-medium">
+                          {infants} × ₹500
+                        </span>
+                      </div>
+                    )}
+                    <div className="border-t border-border/30 pt-1 flex items-center justify-between text-xs font-sans">
+                      <span className="text-muted-foreground font-semibold">
+                        Total Guests
+                      </span>
+                      <span className="text-foreground font-bold">
+                        {totalGuests}
                       </span>
                     </div>
-                    {destination && (
-                      <div className="flex items-center gap-2 text-sm font-sans">
-                        <MapPin className="w-3.5 h-3.5 text-teal" />
-                        <span className="text-foreground">{destination}</span>
+                    {selectedDestination && (
+                      <div className="flex items-center gap-1.5 text-xs font-sans text-muted-foreground border-t border-border/30 pt-1">
+                        <MapPin className="w-3 h-3" />
+                        {selectedDestination.name}
                       </div>
                     )}
                     {travelDates && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-sans">
                         <Calendar className="w-3 h-3" />
-                        {travelDates}
+                        {travelDates} · {nights}N
                       </div>
                     )}
                   </div>
@@ -614,6 +970,16 @@ export default function QuickQuotePage() {
                         </span>
                       </div>
                     )}
+                    {destFeesTotal > 0 && (
+                      <div className="flex justify-between text-sm font-sans">
+                        <span className="text-muted-foreground">
+                          🎫 Destination Fees
+                        </span>
+                        <span className="text-teal font-medium">
+                          ₹{destFeesTotal.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {grandTotal > 0 && <Separator />}
@@ -629,20 +995,18 @@ export default function QuickQuotePage() {
                     </span>
                   </div>
 
-                  {adults > 1 && grandTotal > 0 && (
+                  {totalGuests > 1 && grandTotal > 0 && (
                     <p className="text-xs text-muted-foreground font-sans text-right">
-                      ≈ ₹
-                      {Math.round(
-                        grandTotal / (adults + children * 0.5),
-                      ).toLocaleString()}{" "}
+                      ≈ ₹{Math.round(grandTotal / totalGuests).toLocaleString()}{" "}
                       per person
                     </p>
                   )}
 
-                  {/* Pricing note */}
+                  {/* Rate formula note */}
                   <div className="bg-gold/5 border border-gold/20 rounded-lg px-3 py-2">
                     <p className="text-[10px] font-sans text-muted-foreground">
-                      Rate: (base × adults) + (base × children ÷ 2)
+                      Adults × full rate · Kids (5–12) × 60% · Infants ₹500 flat
+                      each
                     </p>
                   </div>
                 </CardContent>
@@ -661,6 +1025,7 @@ export default function QuickQuotePage() {
                       type="button"
                       onClick={handleWhatsApp}
                       className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-teal hover:bg-teal-dark text-sidebar"
+                      data-ocid="quote.whatsapp.button"
                     >
                       <MessageCircle className="w-4 h-4" />
                       Send via WhatsApp
@@ -670,6 +1035,7 @@ export default function QuickQuotePage() {
                       type="button"
                       onClick={handleEmail}
                       className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg font-sans text-sm font-medium transition-colors bg-gold/20 border border-gold/40 text-gold hover:bg-gold/30"
+                      data-ocid="quote.email.button"
                     >
                       <Mail className="w-4 h-4" />
                       Send via Email
@@ -679,6 +1045,7 @@ export default function QuickQuotePage() {
                       variant="outline"
                       className="w-full font-sans text-sm border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
                       onClick={handleCopy}
+                      data-ocid="quote.copy.button"
                     >
                       <Copy className="w-4 h-4 mr-2" />
                       Copy Quote Text
@@ -687,6 +1054,7 @@ export default function QuickQuotePage() {
                       variant="outline"
                       className="w-full font-sans text-sm border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
                       onClick={() => window.print()}
+                      data-ocid="quote.print.button"
                     >
                       <Printer className="w-4 h-4 mr-2" />
                       Print / Save PDF

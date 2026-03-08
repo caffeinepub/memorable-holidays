@@ -12,12 +12,17 @@ export interface PackageEditorState {
   whatsapp: string;
   adults: number;
   children: number;
+  maleAdults: number;
+  femaleAdults: number;
+  tgOthers: number;
+  kids: number;
   travelDates: string;
   notes: string;
   hotel: string;
   roomType: string;
   foodPackage: string;
   foodRate: number;
+  selectedFoodItems: string[];
   travelOption: string;
   travelRate: number;
   activities: string[];
@@ -28,6 +33,7 @@ export interface PackageEditorState {
   addOnRates: number[];
   totalCost: number;
   images: string[];
+  photos: string[];
   contentBlocks: ContentBlock[];
   packageId?: number;
 }
@@ -59,12 +65,17 @@ const defaultState: PackageEditorState = {
   whatsapp: "",
   adults: 2,
   children: 0,
+  maleAdults: 0,
+  femaleAdults: 0,
+  tgOthers: 0,
+  kids: 0,
   travelDates: "",
   notes: "",
   hotel: "",
   roomType: "",
   foodPackage: "",
   foodRate: 0,
+  selectedFoodItems: [],
   travelOption: "",
   travelRate: 0,
   activities: [],
@@ -75,6 +86,7 @@ const defaultState: PackageEditorState = {
   addOnRates: [],
   totalCost: 0,
   images: [],
+  photos: [],
   contentBlocks: [],
 };
 

@@ -171,6 +171,20 @@ export default function Navigation() {
         : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
     }`;
 
+  const navIconClass = (active: boolean) =>
+    `w-4 h-4 transition-all shrink-0 ${
+      active
+        ? "text-gold drop-shadow-[0_0_6px_rgba(201,162,39,0.7)]"
+        : "text-muted-foreground group-hover:text-foreground"
+    }`;
+
+  const navIconWrapClass = (active: boolean) =>
+    `flex items-center justify-center transition-all duration-200 ${
+      active
+        ? "bg-gold/15 rounded-md p-0.5"
+        : "group-hover:bg-foreground/5 rounded-md p-0.5"
+    }`;
+
   const visibleCore = filterItems(
     coreNavItems,
     isAdmin,
@@ -226,9 +240,9 @@ export default function Navigation() {
           {/* Core Operations */}
           {visibleCore.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} className={navLinkClass(isActive(to))}>
-              <Icon
-                className={`w-4 h-4 transition-all shrink-0 ${isActive(to) ? "text-gold" : "text-muted-foreground group-hover:text-foreground"}`}
-              />
+              <span className={navIconWrapClass(isActive(to))}>
+                <Icon className={navIconClass(isActive(to))} />
+              </span>
               <span className="hidden md:inline">{label}</span>
               {isActive(to) && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gold shadow-glow-gold" />
@@ -246,7 +260,17 @@ export default function Navigation() {
                     visibleMgmt.some((i) => isActive(i.to)),
                   )}
                 >
-                  <CalendarCheck className="w-4 h-4 shrink-0" />
+                  <span
+                    className={navIconWrapClass(
+                      visibleMgmt.some((i) => isActive(i.to)),
+                    )}
+                  >
+                    <CalendarCheck
+                      className={navIconClass(
+                        visibleMgmt.some((i) => isActive(i.to)),
+                      )}
+                    />
+                  </span>
                   <span className="hidden md:inline">Management</span>
                   <ChevronDown className="w-3 h-3 opacity-60" />
                   {visibleMgmt.some((i) => isActive(i.to)) && (
@@ -288,7 +312,17 @@ export default function Navigation() {
                     visibleGrowth.some((i) => isActive(i.to)),
                   )}
                 >
-                  <BarChart3 className="w-4 h-4 shrink-0" />
+                  <span
+                    className={navIconWrapClass(
+                      visibleGrowth.some((i) => isActive(i.to)),
+                    )}
+                  >
+                    <BarChart3
+                      className={navIconClass(
+                        visibleGrowth.some((i) => isActive(i.to)),
+                      )}
+                    />
+                  </span>
                   <span className="hidden md:inline">Growth</span>
                   <ChevronDown className="w-3 h-3 opacity-60" />
                   {visibleGrowth.some((i) => isActive(i.to)) && (
@@ -329,7 +363,17 @@ export default function Navigation() {
                   className={navLinkClass(currentPath.startsWith("/settings"))}
                   data-ocid="settings.button"
                 >
-                  <Settings className="w-4 h-4 shrink-0" />
+                  <span
+                    className={navIconWrapClass(
+                      currentPath.startsWith("/settings"),
+                    )}
+                  >
+                    <Settings
+                      className={navIconClass(
+                        currentPath.startsWith("/settings"),
+                      )}
+                    />
+                  </span>
                   <span className="hidden md:inline">Settings</span>
                   <ChevronDown className="w-3 h-3 opacity-60" />
                   {currentPath.startsWith("/settings") && (

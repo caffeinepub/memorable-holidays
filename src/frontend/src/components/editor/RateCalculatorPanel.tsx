@@ -1,5 +1,7 @@
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 import {
   useGetAllActivityRates,
   useGetAllAddOnRates,
@@ -18,6 +21,7 @@ import {
   useGetAllTravelRates,
   useGetHotelRates,
 } from "../../hooks/useQueries";
+import { masterDataStore } from "../../lib/masterDataStore";
 import type { PackageEditorState } from "../../lib/packageStore";
 
 interface Props {
@@ -54,6 +58,9 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
     useGetAllBoatingRates();
   const { data: addOnRates = [], isLoading: loadingAddOns } =
     useGetAllAddOnRates();
+
+  // Food menu items from master data store
+  const [foodMenuItems] = useState(() => masterDataStore.get().foodMenuItems);
 
   const hotelMap = buildHotelMap(hotelRates);
   const hotelNames = Array.from(hotelMap.keys());
@@ -119,6 +126,29 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
     onChange({ addOns: newAddOns, addOnRates: newRates });
   };
 
+  const handleFoodMenuToggle = (itemId: string, checked: boolean) => {
+    const currentSelected = state.selectedFoodItems ?? [];
+    const newSelected = checked
+      ? [...currentSelected, itemId]
+      : currentSelected.filter((id) => id !== itemId);
+    onChange({ selectedFoodItems: newSelected });
+  };
+
+  // Derived totals from detailed guest breakdown
+  const totalAdults =
+    (state.maleAdults ?? 0) + (state.femaleAdults ?? 0) + (state.tgOthers ?? 0);
+  const totalKids = state.kids ?? 0;
+  // Sync adults with breakdown total if breakdown is being used
+  const effectiveAdults = totalAdults > 0 ? totalAdults : state.adults;
+  const effectiveChildren = totalKids > 0 ? totalKids : state.children;
+
+  // Food menu selected items cost
+  const selectedFoodItems = state.selectedFoodItems ?? [];
+  const foodMenuCost = selectedFoodItems.reduce((sum, id) => {
+    const item = foodMenuItems.find((f) => f.id === id);
+    return sum + (item && !item.isComplimentary ? item.ratePerPerson : 0);
+  }, 0);
+
   // Cost calculation
   const hotelRate = state.hotel
     ? Number(roomTypes.find((r) => r.roomType === state.roomType)?.rate || 0)
@@ -126,17 +156,22 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
   const baseRate =
     hotelRate +
     state.foodRate +
+    foodMenuCost +
     state.travelRate +
     state.boatingRate +
     state.activityRates.reduce((a, b) => a + b, 0) +
     state.addOnRates.reduce((a, b) => a + b, 0);
-  const adultTotal = baseRate * state.adults;
-  const childTotal = Math.floor((baseRate * state.children) / 2);
+  const adultTotal = baseRate * effectiveAdults;
+  const childTotal = Math.floor(baseRate * effectiveChildren * 0.6);
   const grandTotal = adultTotal + childTotal;
 
   // Sync grand total to store whenever it changes
   if (grandTotal !== state.totalCost) {
-    onChange({ totalCost: grandTotal });
+    onChange({
+      totalCost: grandTotal,
+      adults: effectiveAdults,
+      children: effectiveChildren,
+    });
   }
 
   const isAnyLoading =
@@ -158,6 +193,102 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Guest Breakdown */}
+        <div className="space-y-2">
+          <Label className="font-sans text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Guest Breakdown
+          </Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="font-sans text-[10px] text-muted-foreground">
+                Male Adults
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                value={state.maleAdults ?? 0}
+                onChange={(e) =>
+                  onChange({ maleAdults: Math.max(0, Number(e.target.value)) })
+                }
+                className="font-sans text-sm h-8"
+                data-ocid="rates.male_adults.input"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-[10px] text-muted-foreground">
+                Female Adults
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                value={state.femaleAdults ?? 0}
+                onChange={(e) =>
+                  onChange({
+                    femaleAdults: Math.max(0, Number(e.target.value)),
+                  })
+                }
+                className="font-sans text-sm h-8"
+                data-ocid="rates.female_adults.input"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-[10px] text-muted-foreground">
+                TG / Others
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                value={state.tgOthers ?? 0}
+                onChange={(e) =>
+                  onChange({ tgOthers: Math.max(0, Number(e.target.value)) })
+                }
+                className="font-sans text-sm h-8"
+                data-ocid="rates.tg_others.input"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-[10px] text-muted-foreground">
+                Kids (60% rate)
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                value={state.kids ?? 0}
+                onChange={(e) =>
+                  onChange({ kids: Math.max(0, Number(e.target.value)) })
+                }
+                className="font-sans text-sm h-8"
+                data-ocid="rates.kids.input"
+              />
+            </div>
+          </div>
+          {(totalAdults > 0 || totalKids > 0) && (
+            <div className="bg-gold/5 border border-gold/20 rounded-lg px-3 py-2 flex items-center gap-2 flex-wrap">
+              {totalAdults > 0 && (
+                <Badge
+                  variant="outline"
+                  className="font-sans text-[10px] border-gold/40 text-gold"
+                >
+                  {totalAdults} Adults
+                </Badge>
+              )}
+              {totalKids > 0 && (
+                <Badge
+                  variant="outline"
+                  className="font-sans text-[10px] border-teal/40 text-teal"
+                >
+                  {totalKids} Kids
+                </Badge>
+              )}
+              <span className="text-[10px] text-muted-foreground font-sans">
+                Total: {totalAdults + totalKids} guests
+              </span>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
         {/* Hotel */}
         <div className="space-y-2">
           <Label className="font-sans text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -408,6 +539,51 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
           )}
         </div>
 
+        {/* Food Menu Items */}
+        {foodMenuItems.length > 0 && (
+          <div className="space-y-2">
+            <Label className="font-sans text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Food Menu
+            </Label>
+            <div className="space-y-2">
+              {foodMenuItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`food-${item.id}`}
+                      checked={selectedFoodItems.includes(item.id)}
+                      onCheckedChange={(checked) =>
+                        handleFoodMenuToggle(item.id, !!checked)
+                      }
+                    />
+                    <label
+                      htmlFor={`food-${item.id}`}
+                      className="text-sm font-sans cursor-pointer"
+                    >
+                      {item.name}
+                      <span className="ml-1 text-[10px] text-muted-foreground capitalize">
+                        ({item.mealType})
+                      </span>
+                    </label>
+                  </div>
+                  {item.isComplimentary ? (
+                    <Badge className="font-sans text-[10px] bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/20">
+                      Free
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground font-sans">
+                      ₹{item.ratePerPerson.toLocaleString()}/person
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Separator />
 
         {/* Cost Breakdown */}
@@ -425,8 +601,34 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
           )}
           {state.foodPackage && state.foodRate > 0 && (
             <div className="flex justify-between text-sm font-sans">
-              <span className="text-muted-foreground">Food</span>
+              <span className="text-muted-foreground">Food Package</span>
               <span>₹{state.foodRate.toLocaleString()}</span>
+            </div>
+          )}
+          {selectedFoodItems
+            .filter((id) => {
+              const item = foodMenuItems.find((f) => f.id === id);
+              return item && !item.isComplimentary;
+            })
+            .map((id) => {
+              const item = foodMenuItems.find((f) => f.id === id);
+              return item ? (
+                <div
+                  key={id}
+                  className="flex justify-between text-sm font-sans"
+                >
+                  <span className="text-muted-foreground">{item.name}</span>
+                  <span>₹{item.ratePerPerson.toLocaleString()}/person</span>
+                </div>
+              ) : null;
+            })}
+          {selectedFoodItems.some((id) => {
+            const item = foodMenuItems.find((f) => f.id === id);
+            return item?.isComplimentary;
+          }) && (
+            <div className="flex justify-between text-sm font-sans">
+              <span className="text-green-400">Complimentary Meals</span>
+              <span className="text-green-400">Free ✓</span>
             </div>
           )}
           {state.travelOption && state.travelRate > 0 && (
@@ -458,14 +660,15 @@ export default function RateCalculatorPanel({ state, onChange }: Props) {
           <Separator className="my-2" />
           <div className="flex justify-between text-sm font-sans">
             <span className="text-muted-foreground">
-              {state.adults} Adults × ₹{baseRate.toLocaleString()}
+              {effectiveAdults} Adult{effectiveAdults !== 1 ? "s" : ""} × ₹
+              {baseRate.toLocaleString()}
             </span>
             <span>₹{adultTotal.toLocaleString()}</span>
           </div>
-          {state.children > 0 && (
+          {effectiveChildren > 0 && (
             <div className="flex justify-between text-sm font-sans">
               <span className="text-muted-foreground">
-                {state.children} Children (50% off)
+                {effectiveChildren} Kids (60% rate)
               </span>
               <span>₹{childTotal.toLocaleString()}</span>
             </div>

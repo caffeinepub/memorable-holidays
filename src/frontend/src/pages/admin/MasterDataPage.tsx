@@ -54,6 +54,17 @@ import { masterDataStore } from "../../lib/masterDataStore";
 
 // ── Destinations Tab ──────────────────────────────────────────────────────────
 
+const ISLAND_GROUPS = [
+  "South Andaman",
+  "Havelock Island (Swaraj Dweep)",
+  "Neil Island (Shaheed Dweep)",
+  "North & Middle Andaman",
+  "Little Andaman",
+  "Nicobar Islands (Restricted — RAP Required)",
+  "Barren & Volcanic Islands",
+  "Other",
+];
+
 function DestinationsTab() {
   const [data, setData] = useState(() => masterDataStore.get().destinations);
   const [showDialog, setShowDialog] = useState(false);
@@ -64,6 +75,8 @@ function DestinationsTab() {
     description: "",
     popularMonths: "",
     highlights: "",
+    islandGroup: "",
+    specialtyNotes: "",
   });
 
   const openAdd = () => {
@@ -74,6 +87,8 @@ function DestinationsTab() {
       description: "",
       popularMonths: "",
       highlights: "",
+      islandGroup: "",
+      specialtyNotes: "",
     });
     setShowDialog(true);
   };
@@ -86,6 +101,8 @@ function DestinationsTab() {
       description: item.description,
       popularMonths: item.popularMonths,
       highlights: item.highlights,
+      islandGroup: item.islandGroup || "",
+      specialtyNotes: item.specialtyNotes || "",
     });
     setShowDialog(true);
   };
@@ -95,11 +112,20 @@ function DestinationsTab() {
       toast.error("Name is required");
       return;
     }
+    const payload = {
+      name: form.name,
+      country: form.country,
+      description: form.description,
+      popularMonths: form.popularMonths,
+      highlights: form.highlights,
+      islandGroup: form.islandGroup,
+      specialtyNotes: form.specialtyNotes,
+    };
     if (editing) {
-      masterDataStore.updateDestination(editing.id, form);
+      masterDataStore.updateDestination(editing.id, payload);
       toast.success("Destination updated");
     } else {
-      masterDataStore.addDestination(form);
+      masterDataStore.addDestination(payload);
       toast.success("Destination added");
     }
     setData(masterDataStore.get().destinations);
@@ -135,13 +161,16 @@ function DestinationsTab() {
                 Name
               </TableHead>
               <TableHead className="font-sans text-xs text-muted-foreground uppercase">
-                Country
+                Island Group
               </TableHead>
-              <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+              <TableHead className="font-sans text-xs text-muted-foreground uppercase hidden md:table-cell">
                 Popular Months
               </TableHead>
-              <TableHead className="font-sans text-xs text-muted-foreground uppercase">
+              <TableHead className="font-sans text-xs text-muted-foreground uppercase hidden lg:table-cell">
                 Highlights
+              </TableHead>
+              <TableHead className="font-sans text-xs text-muted-foreground uppercase hidden xl:table-cell">
+                Specialty Notes
               </TableHead>
               <TableHead className="w-20" />
             </TableRow>
@@ -150,7 +179,7 @@ function DestinationsTab() {
             {data.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center py-10 text-muted-foreground font-sans text-sm"
                   data-ocid="masterdata.destination.empty_state"
                 >
@@ -167,14 +196,28 @@ function DestinationsTab() {
                   <TableCell className="font-sans font-semibold text-foreground">
                     {item.name}
                   </TableCell>
-                  <TableCell className="font-sans text-sm text-muted-foreground">
-                    {item.country}
+                  <TableCell className="font-sans text-xs text-muted-foreground">
+                    <Badge
+                      variant="outline"
+                      className="text-xs font-sans border-border/50"
+                    >
+                      {item.islandGroup || item.country || "–"}
+                    </Badge>
                   </TableCell>
-                  <TableCell className="font-sans text-sm text-muted-foreground">
+                  <TableCell className="font-sans text-sm text-muted-foreground hidden md:table-cell">
                     {item.popularMonths || "–"}
                   </TableCell>
-                  <TableCell className="font-sans text-xs text-muted-foreground max-w-xs truncate">
+                  <TableCell className="font-sans text-xs text-muted-foreground max-w-xs truncate hidden lg:table-cell">
                     {item.highlights || "–"}
+                  </TableCell>
+                  <TableCell className="font-sans text-xs text-muted-foreground max-w-[180px] truncate hidden xl:table-cell">
+                    {item.specialtyNotes ? (
+                      <span className="text-gold/80">
+                        {item.specialtyNotes}
+                      </span>
+                    ) : (
+                      "–"
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1.5">
@@ -219,13 +262,13 @@ function DestinationsTab() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
-                  placeholder="Goa"
+                  placeholder="Radhanagar Beach"
                   className="font-sans text-sm"
                   data-ocid="masterdata.destination.input"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-sans">Country *</Label>
+                <Label className="text-xs font-sans">Country</Label>
                 <Input
                   value={form.country}
                   onChange={(e) =>
@@ -235,6 +278,26 @@ function DestinationsTab() {
                   className="font-sans text-sm"
                 />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-sans">Island Group</Label>
+              <Select
+                value={form.islandGroup}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, islandGroup: v }))
+                }
+              >
+                <SelectTrigger className="font-sans text-sm">
+                  <SelectValue placeholder="Select island group..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ISLAND_GROUPS.map((g) => (
+                    <SelectItem key={g} value={g} className="font-sans text-sm">
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-sans">Description</Label>
@@ -255,7 +318,7 @@ function DestinationsTab() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, popularMonths: e.target.value }))
                 }
-                placeholder="October – March"
+                placeholder="October – May"
                 className="font-sans text-sm"
               />
             </div>
@@ -269,6 +332,19 @@ function DestinationsTab() {
                 placeholder="Key attractions..."
                 rows={2}
                 className="font-sans text-sm resize-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-sans">Specialty Notes</Label>
+              <Textarea
+                value={form.specialtyNotes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, specialtyNotes: e.target.value }))
+                }
+                placeholder="Special tips, entry requirements, best times, permit info..."
+                rows={3}
+                className="font-sans text-sm resize-none"
+                data-ocid="masterdata.destination.specialty_textarea"
               />
             </div>
           </div>

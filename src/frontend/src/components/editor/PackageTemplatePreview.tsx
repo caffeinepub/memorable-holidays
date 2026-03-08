@@ -1,4 +1,5 @@
 import { companyStore } from "../../lib/companyStore";
+import { masterDataStore } from "../../lib/masterDataStore";
 import type { PackageEditorState } from "../../lib/packageStore";
 
 interface Props {
@@ -87,6 +88,32 @@ export default function PackageTemplatePreview({ state, scale = 1 }: Props) {
   const theme =
     TEMPLATE_THEMES[state.templateColorScheme] || TEMPLATE_THEMES["gold-teal"];
 
+  // Resolve food menu items for display
+  const allFoodItems = masterDataStore.get().foodMenuItems;
+  const selectedFoodItems = (state.selectedFoodItems ?? [])
+    .map((id) => allFoodItems.find((f) => f.id === id))
+    .filter(Boolean) as typeof allFoodItems;
+
+  // Resolve selected destination specialty notes
+  const allDestinations = masterDataStore.get().destinations;
+  // Use the first destination that matches any part of notes or travelDates
+  const destWithNotes = allDestinations.find(
+    (d) =>
+      d.specialtyNotes &&
+      (state.notes?.toLowerCase().includes(d.name.toLowerCase()) ||
+        state.travelDates?.toLowerCase().includes(d.name.toLowerCase())),
+  );
+
+  // Guest breakdown
+  const maleAdults = state.maleAdults ?? 0;
+  const femaleAdults = state.femaleAdults ?? 0;
+  const tgOthers = state.tgOthers ?? 0;
+  const kids = state.kids ?? 0;
+  const hasDetailedGuests =
+    maleAdults > 0 || femaleAdults > 0 || tgOthers > 0 || kids > 0;
+
+  const photos = state.photos ?? [];
+
   return (
     <div
       id="package-preview-content"
@@ -99,6 +126,46 @@ export default function PackageTemplatePreview({ state, scale = 1 }: Props) {
         width: scale !== 1 ? `${100 / scale}%` : "100%",
       }}
     >
+      {/* Photo Grid — displayed above header if photos exist */}
+      {photos.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              photos.length === 1
+                ? "1fr"
+                : photos.length === 2
+                  ? "1fr 1fr"
+                  : "1fr 1fr 1fr",
+            gap: "3px",
+            maxHeight: "200px",
+            overflow: "hidden",
+          }}
+        >
+          {photos.slice(0, Math.min(6, photos.length)).map((photo, idx) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: photos are positional, no stable ID
+              key={`preview-photo-${idx}`}
+              style={{
+                overflow: "hidden",
+                height: "200px",
+              }}
+            >
+              <img
+                src={photo}
+                alt={`Destination view ${idx + 1}`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ backgroundColor: theme.header, padding: "24px 32px" }}>
         <div
@@ -247,16 +314,35 @@ export default function PackageTemplatePreview({ state, scale = 1 }: Props) {
             >
               Guests
             </p>
-            <p
-              style={{
-                color: theme.text,
-                fontSize: "14px",
-                fontWeight: "600",
-                margin: "2px 0 0",
-              }}
-            >
-              {state.adults} Adults · {state.children} Children
-            </p>
+            {hasDetailedGuests ? (
+              <div style={{ margin: "2px 0 0" }}>
+                {maleAdults > 0 && (
+                  <p
+                    style={{
+                      color: theme.text,
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      margin: 0,
+                    }}
+                  >
+                    {maleAdults} Male · {femaleAdults} Female
+                    {tgOthers > 0 ? ` · ${tgOthers} TG/Other` : ""}
+                    {kids > 0 ? ` · ${kids} Kids` : ""}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p
+                style={{
+                  color: theme.text,
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  margin: "2px 0 0",
+                }}
+              >
+                {state.adults} Adults · {state.children} Children
+              </p>
+            )}
           </div>
           <div>
             <p
@@ -505,6 +591,80 @@ export default function PackageTemplatePreview({ state, scale = 1 }: Props) {
                 </span>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Food Menu Items */}
+        {selectedFoodItems.length > 0 && (
+          <div style={{ marginBottom: "16px" }}>
+            <p
+              style={{
+                color: theme.accent,
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                fontWeight: "600",
+                margin: "0 0 8px",
+              }}
+            >
+              🍽️ Meals Included
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {selectedFoodItems.map((item) => (
+                <span
+                  key={item.id}
+                  style={{
+                    backgroundColor: item.isComplimentary
+                      ? "rgba(34,197,94,0.12)"
+                      : `${theme.accent}22`,
+                    color: item.isComplimentary ? "#16a34a" : theme.text,
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                    fontSize: "12px",
+                    border: `1px solid ${item.isComplimentary ? "rgba(34,197,94,0.3)" : `${theme.accent}44`}`,
+                  }}
+                >
+                  {item.name}
+                  {item.isComplimentary && " ✓"}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Specialty Notes from Destination */}
+        {destWithNotes?.specialtyNotes && (
+          <div
+            style={{
+              marginBottom: "16px",
+              border: `1px solid ${theme.accent}33`,
+              borderRadius: "8px",
+              padding: "14px",
+              backgroundColor: `${theme.accent}08`,
+            }}
+          >
+            <p
+              style={{
+                color: theme.accent,
+                fontSize: "10px",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                margin: "0 0 6px",
+                fontWeight: "600",
+              }}
+            >
+              📍 Special Notes — {destWithNotes.name}
+            </p>
+            <p
+              style={{
+                color: theme.text,
+                fontSize: "12px",
+                margin: 0,
+                lineHeight: "1.6",
+              }}
+            >
+              {destWithNotes.specialtyNotes}
+            </p>
           </div>
         )}
 

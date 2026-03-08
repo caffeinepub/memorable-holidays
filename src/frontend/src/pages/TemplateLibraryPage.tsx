@@ -151,129 +151,229 @@ const TEMPLATE_THEMES: Record<
 
 function TemplateThumbnail({
   colorScheme,
+  design,
   category,
 }: { design?: string; colorScheme: string; category: string }) {
   const t = TEMPLATE_THEMES[colorScheme] || TEMPLATE_THEMES["gold-teal"];
+  const isLight = colorScheme === "white-teal";
 
   return (
     <div
       className="w-full aspect-[3/4] rounded-t-lg overflow-hidden relative"
       style={{ backgroundColor: t.bg }}
     >
-      {/* Header bar */}
+      {/* Watermark diagonal pattern */}
       <div
-        className="absolute top-0 left-0 right-0 h-9 flex items-center px-3 gap-2"
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
         style={{
-          backgroundColor: `${t.header}22`,
-          borderBottom: `1px solid ${t.header}44`,
+          backgroundImage: `repeating-linear-gradient(45deg, ${t.accent} 0px, ${t.accent} 1px, transparent 1px, transparent 12px)`,
+        }}
+      />
+
+      {/* Hero image simulation — tall gradient header */}
+      <div
+        className="absolute top-0 left-0 right-0 h-16"
+        style={{
+          background: `linear-gradient(160deg, ${t.header}cc 0%, ${t.bg} 100%)`,
+          borderBottom: `1px solid ${t.accent}33`,
         }}
       >
+        {/* Overlay texture */}
         <div
-          className="w-5 h-5 rounded-full"
-          style={{ backgroundColor: `${t.accent}cc` }}
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `radial-gradient(ellipse at 70% 50%, ${t.accent}55, transparent 70%)`,
+          }}
         />
-        <div
-          className="h-2 rounded flex-1"
-          style={{ backgroundColor: `${t.accent}55` }}
-        />
-        <div className="text-right">
+        {/* Logo placeholder: circle + text lines */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
           <div
-            className="h-1.5 w-10 rounded"
-            style={{ backgroundColor: `${t.accent}44` }}
-          />
+            className="w-6 h-6 rounded-full flex items-center justify-center shadow-md"
+            style={{
+              background: `linear-gradient(135deg, ${t.accent}, ${t.header}bb)`,
+              border: `1.5px solid ${t.accent}99`,
+            }}
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: isLight ? t.bg : `${t.text}cc` }}
+            />
+          </div>
+          <div className="space-y-0.5">
+            <div
+              className="h-1.5 w-14 rounded"
+              style={{ backgroundColor: `${t.text}cc` }}
+            />
+            <div
+              className="h-1 w-9 rounded"
+              style={{ backgroundColor: `${t.text}55` }}
+            />
+          </div>
+        </div>
+        {/* Top-right design badge */}
+        <div
+          className="absolute right-2 top-2 px-1.5 py-0.5 rounded-full"
+          style={{
+            backgroundColor: `${t.accent}33`,
+            border: `1px solid ${t.accent}66`,
+          }}
+        >
+          <span
+            style={{
+              color: t.accent,
+              fontSize: "6px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.8px",
+            }}
+          >
+            {design ?? t.tag}
+          </span>
         </div>
       </div>
 
+      {/* Wave divider */}
+      <div className="absolute left-0 right-0" style={{ top: "60px" }}>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 100 8"
+          preserveAspectRatio="none"
+          style={{ width: "100%", height: "8px", display: "block" }}
+        >
+          <path d="M0,4 C25,8 75,0 100,4 L100,8 L0,8 Z" fill={t.bg} />
+        </svg>
+      </div>
+
       {/* Content area */}
-      <div className="absolute top-11 left-3 right-3 space-y-2">
+      <div
+        className="absolute left-3 right-3 space-y-2"
+        style={{ top: "72px" }}
+      >
+        {/* Category label + title lines */}
+        <div className="flex items-center gap-1.5 mb-1">
+          <div
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: t.accent }}
+          />
+          <div
+            className="h-1.5 w-10 rounded"
+            style={{ backgroundColor: `${t.accent}77`, fontSize: "5px" }}
+          />
+        </div>
         <div
-          className="h-4 rounded"
-          style={{ backgroundColor: `${t.accent}aa`, width: "65%" }}
+          className="h-3 rounded font-bold"
+          style={{ backgroundColor: `${t.accent}bb`, width: "72%" }}
         />
         <div
-          className="h-2 rounded"
-          style={{ backgroundColor: `${t.text}33`, width: "90%" }}
+          className="h-1.5 rounded"
+          style={{ backgroundColor: `${t.text}44`, width: "90%" }}
         />
         <div
-          className="h-2 rounded"
-          style={{ backgroundColor: `${t.text}22`, width: "75%" }}
+          className="h-1.5 rounded"
+          style={{ backgroundColor: `${t.text}2a`, width: "65%" }}
         />
 
-        <div
-          className="mt-2 pt-2 border-t"
-          style={{ borderColor: `${t.accent}22` }}
-        >
-          {/* Simulated package info grid */}
-          <div className="grid grid-cols-2 gap-1.5 mt-1">
+        {/* Photo grid simulation */}
+        <div className="grid grid-cols-3 gap-1 mt-2">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="rounded"
+              style={{
+                height: "22px",
+                background:
+                  i === 0
+                    ? `linear-gradient(135deg, ${t.header}99, ${t.accent}55)`
+                    : i === 1
+                      ? `linear-gradient(135deg, ${t.accent}66, ${t.header}44)`
+                      : `linear-gradient(135deg, ${t.bg}ff, ${t.accent}33)`,
+                border: `1px solid ${t.accent}22`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="pt-1 border-t" style={{ borderColor: `${t.accent}20` }}>
+          {/* Package info grid */}
+          <div className="grid grid-cols-2 gap-1 mt-1">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded p-1.5"
+                className="rounded p-1"
                 style={{
-                  backgroundColor: `${t.accent}15`,
-                  border: `1px solid ${t.accent}22`,
+                  backgroundColor: `${t.accent}12`,
+                  border: `1px solid ${t.accent}1e`,
                 }}
               >
                 <div
-                  className="h-1.5 rounded mb-1"
-                  style={{ backgroundColor: `${t.accent}88`, width: "60%" }}
+                  className="h-1.5 rounded mb-0.5"
+                  style={{ backgroundColor: `${t.accent}88`, width: "55%" }}
                 />
                 <div
                   className="h-1 rounded"
-                  style={{ backgroundColor: `${t.text}33`, width: "80%" }}
+                  style={{ backgroundColor: `${t.text}2e`, width: "75%" }}
                 />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Activities row */}
-        <div className="flex gap-1 flex-wrap mt-1">
-          {[0, 1, 2].map((i) => (
+        {/* Tag pills */}
+        <div className="flex gap-1 flex-wrap">
+          {[category, "Andaman", "Luxury"].slice(0, 3).map((tag) => (
             <div
-              key={i}
-              className="h-4 rounded-full px-2"
+              key={tag}
+              className="rounded-full px-1.5 py-0.5"
               style={{
-                backgroundColor: `${t.accent}25`,
+                backgroundColor: `${t.accent}1e`,
                 border: `1px solid ${t.accent}33`,
               }}
             >
               <div
-                className="h-1.5 w-8 rounded mt-1"
-                style={{ backgroundColor: `${t.accent}66` }}
+                className="h-1.5 rounded"
+                style={{
+                  backgroundColor: `${t.accent}66`,
+                  width: `${tag.length * 3.5}px`,
+                  maxWidth: "24px",
+                }}
               />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Cost summary bar at bottom */}
+      {/* Bottom price bar — gradient + prominent price badge */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-between px-3"
-        style={{ backgroundColor: `${t.header}dd` }}
-      >
-        <div
-          className="h-2 w-16 rounded"
-          style={{ backgroundColor: `${t.accent}88` }}
-        />
-        <div
-          className="h-3 w-12 rounded"
-          style={{ backgroundColor: t.accent }}
-        />
-      </div>
-
-      {/* Design label overlay */}
-      <div
-        className="absolute top-10 right-2 opacity-30"
+        className="absolute bottom-0 left-0 right-0 h-11 flex items-center justify-between px-3"
         style={{
-          color: t.accent,
-          fontSize: "7px",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "1px",
+          background: `linear-gradient(90deg, ${t.header}ee, ${t.accent}cc)`,
+          borderTop: `1px solid ${t.accent}55`,
         }}
       >
-        {category}
+        <div className="space-y-0.5">
+          <div
+            className="h-1.5 w-12 rounded"
+            style={{ backgroundColor: `${t.text}55` }}
+          />
+          <div
+            className="h-1 w-16 rounded"
+            style={{ backgroundColor: `${t.text}33` }}
+          />
+        </div>
+        {/* Price badge */}
+        <div
+          className="px-2 py-1 rounded-full shadow-md"
+          style={{
+            background: `linear-gradient(135deg, ${t.accent}, ${t.header}dd)`,
+            border: `1px solid ${t.text}22`,
+          }}
+        >
+          <div
+            className="h-2 w-10 rounded"
+            style={{ backgroundColor: isLight ? t.bg : `${t.text}dd` }}
+          />
+        </div>
       </div>
     </div>
   );

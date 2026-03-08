@@ -19,6 +19,7 @@ import {
   Edit,
   Eye,
   Hotel,
+  Image,
   Layout,
   Loader2,
   MapPin,
@@ -27,6 +28,7 @@ import {
   Trash2,
   User,
   Utensils,
+  X,
 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -285,10 +287,11 @@ export default function PackageEditorPage() {
           {/* Left: Editor Panels — 2 cols */}
           <div className="xl:col-span-2">
             <Tabs defaultValue="guest" className="w-full">
-              <TabsList className="w-full grid grid-cols-4 mb-4 bg-card border border-border/50 h-11">
+              <TabsList className="w-full grid grid-cols-5 mb-4 bg-card border border-border/50 h-11">
                 <TabsTrigger
                   value="guest"
                   className="font-sans text-xs gap-1.5 data-[state=active]:text-foreground"
+                  data-ocid="editor.guest.tab"
                 >
                   <User className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Guest</span>
@@ -296,6 +299,7 @@ export default function PackageEditorPage() {
                 <TabsTrigger
                   value="rates"
                   className="font-sans text-xs gap-1.5 data-[state=active]:text-foreground"
+                  data-ocid="editor.rates.tab"
                 >
                   <Calculator className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Rates</span>
@@ -303,6 +307,7 @@ export default function PackageEditorPage() {
                 <TabsTrigger
                   value="content"
                   className="font-sans text-xs gap-1.5 data-[state=active]:text-foreground"
+                  data-ocid="editor.content.tab"
                 >
                   <Layout className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Content</span>
@@ -310,9 +315,18 @@ export default function PackageEditorPage() {
                 <TabsTrigger
                   value="itinerary"
                   className="font-sans text-xs gap-1.5 data-[state=active]:text-foreground"
+                  data-ocid="editor.itinerary.tab"
                 >
                   <CalendarDays className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Itinerary</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="photos"
+                  className="font-sans text-xs gap-1.5 data-[state=active]:text-foreground"
+                  data-ocid="editor.photos.tab"
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Photos</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -474,6 +488,126 @@ export default function PackageEditorPage() {
                     )}
                   </div>
                 )}
+              </TabsContent>
+
+              {/* Photos Tab */}
+              <TabsContent value="photos" className="mt-0">
+                <Card className="premium-card">
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-display font-semibold text-foreground">
+                          Package Photos
+                        </p>
+                        <p className="text-xs text-muted-foreground font-sans mt-0.5">
+                          Add up to 10 photos to showcase in the package
+                          template
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editorState.photos &&
+                          editorState.photos.length > 0 && (
+                            <span className="text-xs font-sans text-gold font-semibold bg-gold/10 border border-gold/30 rounded-full px-2.5 py-0.5">
+                              {editorState.photos.length}/10
+                            </span>
+                          )}
+                        {(!editorState.photos ||
+                          editorState.photos.length < 10) && (
+                          <label
+                            htmlFor="photo-upload"
+                            className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-sans bg-teal hover:bg-teal-dark text-white rounded-md px-3 py-1.5 transition-colors"
+                            data-ocid="editor.photos.upload_button"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add Photos
+                            <input
+                              id="photo-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                const currentPhotos = editorState.photos || [];
+                                const remaining = 10 - currentPhotos.length;
+                                const toProcess = files.slice(0, remaining);
+                                Promise.all(
+                                  toProcess.map(
+                                    (file) =>
+                                      new Promise<string>((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) =>
+                                          resolve(ev.target?.result as string);
+                                        reader.readAsDataURL(file);
+                                      }),
+                                  ),
+                                ).then((newPhotos) => {
+                                  updateState({
+                                    photos: [...currentPhotos, ...newPhotos],
+                                  });
+                                });
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {!editorState.photos || editorState.photos.length === 0 ? (
+                      <div
+                        className="border-2 border-dashed border-border/60 rounded-xl p-10 flex flex-col items-center gap-3 text-center"
+                        data-ocid="editor.photos.dropzone"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center">
+                          <Image className="w-6 h-6 text-muted-foreground/40" />
+                        </div>
+                        <p className="text-sm text-muted-foreground font-sans">
+                          No photos added yet
+                        </p>
+                        <p className="text-xs text-muted-foreground/60 font-sans">
+                          Click "Add Photos" to upload images that will appear
+                          in the package template
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2">
+                        {editorState.photos.map((photo, idx) => (
+                          <div
+                            // biome-ignore lint/suspicious/noArrayIndexKey: photos are positional, no stable ID
+                            key={`photo-${idx}`}
+                            className="relative group aspect-square rounded-lg overflow-hidden border border-border/60"
+                            data-ocid={`editor.photos.item.${idx + 1}`}
+                          >
+                            <img
+                              src={photo}
+                              alt={`Destination view ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors" />
+                            <button
+                              type="button"
+                              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                const newPhotos = [
+                                  ...(editorState.photos || []),
+                                ];
+                                newPhotos.splice(idx, 1);
+                                updateState({ photos: newPhotos });
+                              }}
+                              data-ocid={`editor.photos.delete_button.${idx + 1}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="absolute bottom-1 left-1 text-[9px] font-sans text-white/80 bg-black/40 rounded px-1">
+                              {idx + 1}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

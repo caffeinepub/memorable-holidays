@@ -238,26 +238,37 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          {stats.map(({ label, value, icon: Icon, color, bg }) => (
-            <Card
-              key={label}
-              className="premium-card hover:border-gold/30 transition-all"
-            >
-              <CardContent className="p-4">
-                <div
-                  className={`w-9 h-9 rounded-lg border flex items-center justify-center mb-3 ${bg}`}
-                >
-                  <Icon className={`w-4 h-4 ${color}`} />
-                </div>
-                <p className="text-xl font-display font-bold text-foreground">
-                  {value}
-                </p>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5 leading-tight">
-                  {label}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+          {stats.map(({ label, value, icon: Icon, color, bg }) => {
+            const isRevenue = label === "Total Revenue";
+            return (
+              <Card
+                key={label}
+                className="premium-card hover:border-gold/30 transition-all group"
+              >
+                <CardContent className="p-4">
+                  {/* Icon container with inner glow + gradient bg */}
+                  <div
+                    className={`w-11 h-11 rounded-xl border flex items-center justify-center mb-3 transition-all duration-300 group-hover:scale-110 group-hover:shadow-md ${bg}`}
+                    style={{
+                      boxShadow: undefined,
+                    }}
+                  >
+                    <Icon
+                      className={`w-5 h-5 ${color} transition-all duration-300 group-hover:scale-110`}
+                    />
+                  </div>
+                  <p
+                    className={`text-xl font-display font-bold ${isRevenue ? "text-gradient-gold" : "text-foreground"}`}
+                  >
+                    {value}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5 leading-tight">
+                    {label}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Quick Actions */}
@@ -274,7 +285,14 @@ export default function DashboardPage() {
                   onClick={action}
                   className={`group relative overflow-hidden bg-gradient-to-br ${gradient} rounded-xl p-5 text-left transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-lg shrink-0 w-44`}
                 >
-                  <Icon className="w-7 h-7 mb-3 text-white/90" />
+                  {/* Large faded background icon */}
+                  <Icon className="absolute bottom-2 right-2 w-16 h-16 text-white opacity-[0.08] pointer-events-none" />
+                  {/* Shine sweep on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none" />
+                  {/* Circular icon container */}
+                  <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center mb-3 shadow-inner">
+                    <Icon className="w-5 h-5 text-white/95" />
+                  </div>
                   <p className="font-display font-bold text-base mb-0.5 text-white leading-tight">
                     {label}
                   </p>
