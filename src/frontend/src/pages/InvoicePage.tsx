@@ -10,6 +10,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,20 +30,28 @@ import {
   Eye,
   FileText,
   Loader2,
+  Percent,
   Plus,
   Printer,
   Receipt,
   Trash2,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice, InvoiceLineItem } from "../backend.d.ts";
+import { useIsAdminOrStaff } from "../hooks/useIsAdminOrStaff";
 import {
   useCreateInvoice,
   useGetAllInvoices,
   useGetCompanySettings,
   useMarkInvoicePaid,
 } from "../hooks/useQueries";
+import {
+  type AppliedMarkup,
+  type MarkupRule,
+  markupStore,
+} from "../lib/markupStore";
 
 const STATUS_COLORS: Record<string, string> = {
   Draft: "bg-gray-500/20 text-gray-400 border-gray-500/30",
@@ -53,9 +68,65 @@ export default function InvoicePage() {
     useCreateInvoice();
   const { mutateAsync: markPaid } = useMarkInvoicePaid();
 
+  const isAdminOrStaff = useIsAdminOrStaff();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
+  const [markupInvoice, setMarkupInvoice] = useState<Invoice | null>(null);
+  const [selectedMarkupRuleId, setSelectedMarkupRuleId] = useState("");
+  const [markupNotes, setMarkupNotes] = useState("");
+  const [appliedMarkupsMap, setAppliedMarkupsMap] = useState<
+    Record<string, AppliedMarkup[]>
+  >({});
+
+  // Load applied markups for all invoices
+  const refreshApplied = (invoiceId?: string) => {
+    if (invoiceId) {
+      const updated = { ...appliedMarkupsMap };
+      updated[invoiceId] = markupStore.getAppliedForEntity(
+        "invoice",
+        invoiceId,
+      );
+      setAppliedMarkupsMap(updated);
+    }
+  };
+
+  const getAppliedForInvoice = (invoiceId: string) =>
+    appliedMarkupsMap[invoiceId] ??
+    markupStore.getAppliedForEntity("invoice", invoiceId);
+
+  const markupRules = markupStore.getRules().filter((r) => r.isActive);
+
+  const handleApplyMarkup = () => {
+    if (!markupInvoice || !selectedMarkupRuleId) {
+      toast.error("Please select a markup rule");
+      return;
+    }
+    const rule = markupStore
+      .getRules()
+      .find((r) => r.id === selectedMarkupRuleId);
+    if (!rule) return;
+    const baseAmount = Number(markupInvoice.grandTotal);
+    markupStore.applyMarkup(
+      rule,
+      baseAmount,
+      "invoice",
+      String(markupInvoice.id),
+      "Admin",
+      markupNotes,
+    );
+    refreshApplied(String(markupInvoice.id));
+    toast.success(`Markup "${rule.name}" applied`);
+    setMarkupInvoice(null);
+    setSelectedMarkupRuleId("");
+    setMarkupNotes("");
+  };
+
+  const handleRemoveApplied = (appliedId: string, invoiceId: string) => {
+    markupStore.removeApplied(appliedId);
+    refreshApplied(invoiceId);
+    toast.success("Markup removed");
+  };
   const [guestName, setGuestName] = useState("");
   const [packageId] = useState("0");
   const [taxPercent, setTaxPercent] = useState("18");
@@ -354,6 +425,17 @@ export default function InvoicePage() {
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
+                          {isAdminOrStaff && (
+                            <button
+                              type="button"
+                              onClick={() => setMarkupInvoice(inv)}
+                              className="text-muted-foreground hover:text-amber-400 transition-colors"
+                              title="Apply Markup (Internal)"
+                              data-ocid="invoices.markup.button"
+                            >
+                              <Percent className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {inv.status === "Paid" && (
                             <button
                               type="button"
@@ -648,6 +730,171 @@ export default function InvoicePage() {
         )}
       </Dialog>
 
+      {/* Apply Markup Modal (admin/staff only) */}
+      {isAdminOrStaff && (
+        <Dialog
+          open={!!markupInvoice}
+          onOpenChange={() => {
+            setMarkupInvoice(null);
+            setSelectedMarkupRuleId("");
+            setMarkupNotes("");
+          }}
+        >
+          {markupInvoice && (
+            <DialogContent
+              className="bg-card border-border max-w-md"
+              data-ocid="invoices.markup.dialog"
+            >
+              <DialogHeader>
+                <DialogTitle className="font-display text-lg flex items-center gap-2">
+                  <Percent className="w-5 h-5 text-amber-400" />
+                  Apply Markup — Internal Only
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-xs font-sans text-amber-400">
+                  Markup is never shown to the guest. Only admin and staff can
+                  see it.
+                </div>
+                <div className="bg-sidebar rounded-lg px-3 py-2 text-sm font-sans">
+                  <span className="text-muted-foreground">Invoice: </span>
+                  <span className="font-mono text-gold">
+                    {markupInvoice.invoiceNumber}
+                  </span>
+                  <span className="text-muted-foreground ml-3">Guest: </span>
+                  <span className="font-semibold text-foreground">
+                    {markupInvoice.guestName}
+                  </span>
+                  <span className="text-muted-foreground ml-3">Total: </span>
+                  <span className="font-mono text-gold">
+                    ₹{Number(markupInvoice.grandTotal).toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-sans">
+                    Select Markup Rule *
+                  </Label>
+                  {markupRules.length === 0 ? (
+                    <p className="text-xs text-muted-foreground font-sans">
+                      No active markup rules. Go to Settings &gt; Rate
+                      Management &gt; Markup Rates to create rules.
+                    </p>
+                  ) : (
+                    <Select
+                      value={selectedMarkupRuleId}
+                      onValueChange={setSelectedMarkupRuleId}
+                    >
+                      <SelectTrigger
+                        className="font-sans text-sm"
+                        data-ocid="invoices.markup.rule.select"
+                      >
+                        <SelectValue placeholder="Choose a markup rule..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {markupRules.map((rule: MarkupRule) => (
+                          <SelectItem
+                            key={rule.id}
+                            value={rule.id}
+                            className="font-sans text-sm"
+                          >
+                            <span>{rule.name}</span>
+                            <span className="ml-2 text-muted-foreground text-xs">
+                              (
+                              {rule.type === "percentage"
+                                ? `${rule.value}%`
+                                : `₹${rule.value} fixed`}{" "}
+                              ·{" "}
+                              {rule.appliesTo === "all"
+                                ? "All"
+                                : rule.appliesTo}
+                              )
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                {selectedMarkupRuleId &&
+                  (() => {
+                    const rule = markupRules.find(
+                      (r: MarkupRule) => r.id === selectedMarkupRuleId,
+                    );
+                    if (!rule) return null;
+                    const base = Number(markupInvoice.grandTotal);
+                    const markup =
+                      rule.type === "percentage"
+                        ? Math.round((base * rule.value) / 100)
+                        : rule.value;
+                    return (
+                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-sm font-sans space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Base Amount
+                          </span>
+                          <span className="font-mono">
+                            ₹{base.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-amber-400">
+                          <span>Markup ({rule.name})</span>
+                          <span className="font-mono font-bold">
+                            +₹{markup.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-bold border-t border-amber-500/20 pt-1 mt-1">
+                          <span className="text-foreground">
+                            Internal Total
+                          </span>
+                          <span className="font-mono text-gold">
+                            ₹{(base + markup).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-sans">Notes (optional)</Label>
+                  <Textarea
+                    value={markupNotes}
+                    onChange={(e) => setMarkupNotes(e.target.value)}
+                    placeholder="e.g. Corporate booking commission"
+                    rows={2}
+                    className="font-sans text-sm resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setMarkupInvoice(null);
+                      setSelectedMarkupRuleId("");
+                      setMarkupNotes("");
+                    }}
+                    className="flex-1 font-sans"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleApplyMarkup}
+                    disabled={!selectedMarkupRuleId || markupRules.length === 0}
+                    className="flex-1 font-sans bg-amber-600 hover:bg-amber-700 text-white"
+                    data-ocid="invoices.markup.apply_button"
+                  >
+                    <Percent className="w-4 h-4 mr-1" />
+                    Apply Markup
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          )}
+        </Dialog>
+      )}
+
       {/* View Invoice Modal */}
       <Dialog open={!!viewInvoice} onOpenChange={() => setViewInvoice(null)}>
         {viewInvoice && (
@@ -751,6 +998,102 @@ export default function InvoicePage() {
                   </span>
                 </div>
               </div>
+
+              {/* ── Internal Markup Breakdown (admin/staff only, never in print) ── */}
+              {isAdminOrStaff &&
+                (() => {
+                  const applied = getAppliedForInvoice(String(viewInvoice.id));
+                  const totalMarkup = applied.reduce(
+                    (s, a) => s + a.markupAmount,
+                    0,
+                  );
+                  return applied.length > 0 ? (
+                    <div className="no-print bg-amber-500/5 border border-amber-500/25 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Percent className="w-3.5 h-3.5 text-amber-400" />
+                        <p className="text-xs font-semibold text-amber-300 uppercase tracking-wide">
+                          Internal Markup (Not shown to guest)
+                        </p>
+                      </div>
+                      {applied.map((a) => (
+                        <div
+                          key={a.id}
+                          className="flex items-center justify-between text-sm font-sans"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-300/80">
+                              {a.ruleName}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              (
+                              {a.ruleType === "percentage"
+                                ? `${a.ruleValue}%`
+                                : `₹${a.ruleValue} fixed`}
+                              )
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-amber-400 font-semibold">
+                              +₹{a.markupAmount.toLocaleString()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveApplied(
+                                  a.id,
+                                  String(viewInvoice.id),
+                                )
+                              }
+                              className="text-muted-foreground hover:text-destructive"
+                              title="Remove markup"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-sm font-sans font-bold border-t border-amber-500/20 pt-2">
+                        <span className="text-amber-300">Total Markup</span>
+                        <span className="font-mono text-amber-400">
+                          +₹{totalMarkup.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm font-sans font-bold">
+                        <span className="text-foreground">
+                          Total (incl. markup)
+                        </span>
+                        <span className="font-mono text-gold">
+                          ₹
+                          {(
+                            Number(viewInvoice.grandTotal) + totalMarkup
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-500/60 font-sans mt-1">
+                        ⚠️ Markup is for internal accounting only. Guest bill
+                        shows ₹{Number(viewInvoice.grandTotal).toLocaleString()}{" "}
+                        only.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="no-print flex items-center justify-between bg-muted/20 border border-border/40 rounded-lg px-3 py-2">
+                      <p className="text-xs text-muted-foreground font-sans flex items-center gap-1.5">
+                        <Percent className="w-3 h-3 text-amber-400" />
+                        No markup applied to this invoice
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewInvoice(null);
+                          setMarkupInvoice(viewInvoice);
+                        }}
+                        className="text-xs text-amber-400 hover:text-amber-300 font-sans"
+                      >
+                        Apply Markup
+                      </button>
+                    </div>
+                  );
+                })()}
 
               {viewInvoice.notes && (
                 <p className="text-sm font-sans text-muted-foreground">

@@ -39,6 +39,7 @@ import {
   Loader2,
   MapPin,
   Pencil,
+  Percent,
   Plus,
   Star,
   Trash2,
@@ -50,6 +51,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import type { HotelRate, RateOption } from "../../backend";
+import { useIsAdmin } from "../../hooks/useIsAdminOrStaff";
 import {
   useAddHotelRate,
   useAddOrUpdateActivityRate,
@@ -71,6 +73,12 @@ import {
   useGetHotelRates,
   useUpdateHotelRate,
 } from "../../hooks/useQueries";
+import type { MarkupRule } from "../../lib/markupStore";
+import {
+  MARKUP_APPLIES_TO_LABELS,
+  MARKUP_TYPE_LABELS,
+  markupStore,
+} from "../../lib/markupStore";
 import type { CabRate, FoodMenuItem } from "../../lib/masterDataStore";
 import { masterDataStore } from "../../lib/masterDataStore";
 
@@ -1688,6 +1696,475 @@ function DestinationRatesTab() {
   );
 }
 
+// ─── Markup Tab ───────────────────────────────────────────────────────────────
+
+const APPLIES_TO_OPTIONS = Object.entries(MARKUP_APPLIES_TO_LABELS) as [
+  MarkupRule["appliesTo"],
+  string,
+][];
+
+const TYPE_OPTIONS = Object.entries(MARKUP_TYPE_LABELS) as [
+  MarkupRule["type"],
+  string,
+][];
+
+function MarkupTab() {
+  const isAdmin = useIsAdmin();
+  const [rules, setRules] = useState<MarkupRule[]>(() =>
+    markupStore.getRules(),
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    type: "percentage" as MarkupRule["type"],
+    value: "",
+    appliesTo: "all" as MarkupRule["appliesTo"],
+    notes: "",
+  });
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      type: "percentage",
+      value: "",
+      appliesTo: "all",
+      notes: "",
+    });
+    setEditingId(null);
+  };
+
+  const openEdit = (rule: MarkupRule) => {
+    setEditingId(rule.id);
+    setForm({
+      name: rule.name,
+      type: rule.type,
+      value: String(rule.value),
+      appliesTo: rule.appliesTo,
+      notes: rule.notes,
+    });
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) {
+      toast.error("Markup name is required");
+      return;
+    }
+    const val = Number(form.value);
+    if (Number.isNaN(val) || val <= 0) {
+      toast.error("Enter a valid markup value greater than 0");
+      return;
+    }
+    if (form.type === "percentage" && val > 100) {
+      toast.error("Percentage markup cannot exceed 100%");
+      return;
+    }
+    if (editingId) {
+      markupStore.updateRule(editingId, {
+        name: form.name.trim(),
+        type: form.type,
+        value: val,
+        appliesTo: form.appliesTo,
+        notes: form.notes,
+      });
+      toast.success("Markup rule updated");
+    } else {
+      markupStore.addRule({
+        name: form.name.trim(),
+        type: form.type,
+        value: val,
+        appliesTo: form.appliesTo,
+        notes: form.notes,
+      });
+      toast.success("Markup rule created");
+    }
+    setRules(markupStore.getRules());
+    resetForm();
+  };
+
+  const handleDelete = (id: string) => {
+    markupStore.deleteRule(id);
+    setRules(markupStore.getRules());
+    toast.success("Markup rule deleted");
+  };
+
+  const handleToggle = (id: string) => {
+    markupStore.toggleRule(id);
+    setRules(markupStore.getRules());
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+        <Percent className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="font-sans text-sm font-semibold text-amber-300">
+            Internal Use Only
+          </p>
+          <p className="font-sans text-xs text-amber-400/80 mt-0.5">
+            Markup rates are visible only to admin and staff. They are never
+            shown in guest bills, booking confirmations, or printed/shared
+            package documents.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Add / Edit Form (admin only) */}
+        <Card className="premium-card lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif text-lg flex items-center gap-2">
+              <Percent className="w-4 h-4 text-gold" />
+              {editingId ? "Edit Markup Rule" : "New Markup Rule"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!isAdmin && (
+              <div className="bg-muted/30 border border-border rounded-md px-3 py-2 text-xs font-sans text-muted-foreground">
+                Only the admin can create or edit markup rules.
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label className="font-sans text-xs">Rule Name *</Label>
+              <Input
+                value={form.name}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
+                placeholder="e.g. Agent Commission, Festival Surcharge"
+                className="font-sans text-sm"
+                disabled={!isAdmin}
+                data-ocid="markup.name.input"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-xs">Markup Type</Label>
+              <Select
+                value={form.type}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, type: v as MarkupRule["type"] }))
+                }
+                disabled={!isAdmin}
+              >
+                <SelectTrigger
+                  className="font-sans text-sm"
+                  data-ocid="markup.type.select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_OPTIONS.map(([val, label]) => (
+                    <SelectItem
+                      key={val}
+                      value={val}
+                      className="font-sans text-sm"
+                    >
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-xs">
+                {form.type === "percentage"
+                  ? "Percentage (%)"
+                  : "Fixed Amount (₹)"}
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                max={form.type === "percentage" ? "100" : undefined}
+                step={form.type === "percentage" ? "0.5" : "1"}
+                value={form.value}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, value: e.target.value }))
+                }
+                placeholder={form.type === "percentage" ? "15" : "500"}
+                className="font-sans text-sm"
+                disabled={!isAdmin}
+                data-ocid="markup.value.input"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-xs">Applies To</Label>
+              <Select
+                value={form.appliesTo}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    appliesTo: v as MarkupRule["appliesTo"],
+                  }))
+                }
+                disabled={!isAdmin}
+              >
+                <SelectTrigger
+                  className="font-sans text-sm"
+                  data-ocid="markup.applies_to.select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {APPLIES_TO_OPTIONS.map(([val, label]) => (
+                    <SelectItem
+                      key={val}
+                      value={val}
+                      className="font-sans text-sm"
+                    >
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="font-sans text-xs">Internal Notes</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
+                placeholder="e.g. Applied for corporate bookings"
+                rows={2}
+                className="font-sans text-sm resize-none"
+                disabled={!isAdmin}
+              />
+            </div>
+            {isAdmin && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleSave}
+                  className="flex-1 font-sans bg-gold hover:bg-gold/80 text-background"
+                  data-ocid="markup.save_button"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  {editingId ? "Update Rule" : "Create Rule"}
+                </Button>
+                {editingId && (
+                  <Button
+                    variant="outline"
+                    onClick={resetForm}
+                    className="font-sans"
+                    data-ocid="markup.cancel_button"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Rules Table */}
+        <Card className="premium-card lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-serif text-lg">
+              Markup Rules ({rules.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {rules.length === 0 ? (
+              <div
+                className="text-center py-12"
+                data-ocid="markup.rules.empty_state"
+              >
+                <Percent className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="font-sans text-sm text-muted-foreground">
+                  No markup rules created yet.
+                </p>
+                <p className="font-sans text-xs text-muted-foreground/60 mt-1">
+                  Create a rule above, then apply it to any booking or invoice.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-sans text-xs">Name</TableHead>
+                      <TableHead className="font-sans text-xs">Type</TableHead>
+                      <TableHead className="font-sans text-xs text-right">
+                        Value
+                      </TableHead>
+                      <TableHead className="font-sans text-xs">
+                        Applies To
+                      </TableHead>
+                      <TableHead className="font-sans text-xs text-center">
+                        Active
+                      </TableHead>
+                      {isAdmin && (
+                        <TableHead className="font-sans text-xs text-right w-20">
+                          Actions
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rules.map((rule, idx) => (
+                      <TableRow
+                        key={rule.id}
+                        data-ocid={`markup.rules.row.${idx + 1}`}
+                        className={!rule.isActive ? "opacity-50" : ""}
+                      >
+                        <TableCell>
+                          <div>
+                            <p className="font-sans text-sm font-medium">
+                              {rule.name}
+                            </p>
+                            {rule.notes && (
+                              <p className="font-sans text-xs text-muted-foreground truncate max-w-[180px]">
+                                {rule.notes}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`text-xs font-sans px-2 py-0.5 rounded-full border ${
+                              rule.type === "percentage"
+                                ? "bg-teal/10 text-teal border-teal/20"
+                                : "bg-gold/10 text-gold border-gold/20"
+                            }`}
+                          >
+                            {rule.type === "percentage" ? "%" : "₹ Fixed"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-right font-bold text-amber-400">
+                          {rule.type === "percentage"
+                            ? `${rule.value}%`
+                            : `₹${rule.value.toLocaleString()}`}
+                        </TableCell>
+                        <TableCell className="font-sans text-xs text-muted-foreground">
+                          {MARKUP_APPLIES_TO_LABELS[rule.appliesTo]}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch
+                            checked={rule.isActive}
+                            onCheckedChange={() => handleToggle(rule.id)}
+                            disabled={!isAdmin}
+                            data-ocid={`markup.rules.toggle.${idx + 1}`}
+                          />
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                onClick={() => openEdit(rule)}
+                                data-ocid={`markup.rules.edit_button.${idx + 1}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-destructive hover:text-destructive/80"
+                                    data-ocid={`markup.rules.delete_button.${idx + 1}`}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="font-serif">
+                                      Delete Markup Rule
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription className="font-sans">
+                                      Delete{" "}
+                                      <strong>&quot;{rule.name}&quot;</strong>?
+                                      Any applied markups using this rule will
+                                      also be removed. This cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel className="font-sans">
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="font-sans bg-destructive hover:bg-destructive/90 text-white"
+                                      onClick={() => handleDelete(rule.id)}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* How Markup Works info card */}
+      <Card className="premium-card border-gold/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-serif text-base text-gold">
+            How Markup Works
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-sans text-muted-foreground">
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-gold/20 text-gold flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                1
+              </div>
+              <div>
+                <p className="font-semibold text-foreground mb-1">
+                  Create Rules Here
+                </p>
+                <p className="text-xs">
+                  Define markup rules as a percentage or fixed amount. Set which
+                  booking type they apply to.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-gold/20 text-gold flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                2
+              </div>
+              <div>
+                <p className="font-semibold text-foreground mb-1">
+                  Apply to Invoices
+                </p>
+                <p className="text-xs">
+                  Go to Invoices and use &quot;Apply Markup&quot; on any invoice
+                  to attach a rule. The markup amount is calculated and stored
+                  internally.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-gold/20 text-gold flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                3
+              </div>
+              <div>
+                <p className="font-semibold text-foreground mb-1">
+                  Hidden from Guests
+                </p>
+                <p className="text-xs">
+                  Markup details never appear in the guest bill or printed
+                  invoice. Only admin and staff see the internal breakdown.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function RateManagementPage() {
@@ -1823,6 +2300,14 @@ export default function RateManagementPage() {
             <MapPin className="w-3.5 h-3.5 mr-1.5" />
             Destination Fees
           </TabsTrigger>
+          <TabsTrigger
+            value="markup"
+            className="font-sans text-xs border border-amber-500/30 data-[state=active]:bg-amber-500/20 data-[state=active]:text-amber-300"
+            data-ocid="rates.markup.tab"
+          >
+            <Percent className="w-3.5 h-3.5 mr-1.5" />
+            Markup Rates
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="foodmenu">
@@ -1904,6 +2389,10 @@ export default function RateManagementPage() {
 
         <TabsContent value="destrates">
           <DestinationRatesTab />
+        </TabsContent>
+
+        <TabsContent value="markup">
+          <MarkupTab />
         </TabsContent>
       </Tabs>
     </div>

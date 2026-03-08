@@ -1,31 +1,35 @@
 # Memorable Holidays
 
 ## Current State
+Full-stack tourism package management app with: package editor, CRM (leads/customers/bookings), invoices, rate management (hotels, food, cabs, activities, boating, add-ons, destination fees), user management with per-module privileges, and staff credential login.
 
-A full-stack tourism package management application with:
-- 20+ pages including Dashboard, Package Editor, CRM (Leads/Customers/Bookings/Vendors), Analytics, Reminders, Invoices, Promotions, Reviews, Itinerary Builder, Quick Quote
-- Admin settings: Company Settings, Rate Management, User Management, Master Data
-- Credential-based staff login (CEO/Manager) with per-module privilege control
-- Internet Identity (admin) + username/password (staff) authentication
-- Auto-calculated package pricing based on hotel/food/travel/activity/boating rates
-- PDF/Image export and WhatsApp/Email sharing
+**Known persistent issue:** `CredentialSessionProvider` is defined in `CredentialSessionContext.tsx` but is NOT imported or used in `main.tsx`. This causes `AppLayout` to crash on every load since it calls `useCredentialSession()` without a provider wrapper. This must be fixed in this build.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Nothing new to add
+- **Markup Management** tab in Settings > Rate Management (admin and authorized staff only)
+  - Admin can create markup rules: name, type (percentage or fixed amount), value, applies-to category (All Bookings / Hotel / Activities / Food / Transport / Boating / Custom), optional notes
+  - Admin can assign a markup rule to any booking/package on demand (not automatic)
+  - Markup rules are stored in localStorage via a `markupStore`
+  - A "Markup Applied" section visible only to admin/staff in the Package Editor and Invoice page showing the markup breakdown and adjusted total
+  - Guest-facing views (Package Preview print/share, guest bill / invoice print output) must NEVER show markup line items or markup total - only the final price after markup is shown as the package total
+  - Staff can see markup details in the internal invoice view and package summary, but cannot edit markup rules (only admin can add/edit/delete markup rules)
+  - A `useIsAdminOrStaff()` hook that returns true if the user is logged in as admin (Internet Identity) or as a credential user
 
 ### Modify
-- **CRITICAL FIX**: `main.tsx` was missing `CredentialSessionProvider` wrapper around the entire app. This caused `useCredentialSession()` to throw an error in `AppLayout.tsx` and `Navigation.tsx` on every page load, crashing the app before any page could render. This prevented the Settings dropdown from opening and all navigation from working.
-- Ensure all settings pages (Company Settings, Rate Management, User Management, Master Data) are accessible and fully functional
-- Verify TypeScript compilation passes cleanly
+- `main.tsx` - add `CredentialSessionProvider` import and wrap app with it (permanent fix)
+- `RateManagementPage.tsx` - add new "Markup" tab at the end of the tabs list
+- `InvoicePage.tsx` - show markup section in internal view (admin/staff only), hide from print/guest bill output
+- `PackageEditorPage.tsx` (if exists) or `PackagePreviewPage.tsx` - show markup breakdown to admin/staff only in the internal summary panel
 
 ### Remove
-- Nothing to remove
+- Nothing removed
 
 ## Implementation Plan
-
-1. Fix root crash: `CredentialSessionProvider` is now properly added to `main.tsx` wrapping the entire app tree (DONE)
-2. Verify build passes with zero TypeScript errors
-3. Verify all 20+ pages are accessible and functional
-4. Deploy
+1. Fix `main.tsx` - add `CredentialSessionProvider` wrapping `<App />`
+2. Create `src/frontend/src/lib/markupStore.ts` - localStorage-backed store for markup rules and applied markups
+3. Create `src/frontend/src/hooks/useIsAdminOrStaff.ts` - hook that returns boolean based on login state
+4. Add `MarkupTab` component inside `RateManagementPage.tsx` with full CRUD for markup rules, and an "Apply Markup" panel to assign rules to bookings/packages
+5. Add markup visibility in `InvoicePage.tsx` - staff/admin internal section showing markup, hidden in print CSS
+6. Verify build passes with zero errors
